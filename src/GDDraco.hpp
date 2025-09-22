@@ -5,11 +5,17 @@
 #include <godot_cpp/classes/gltf_state.hpp>
 #include <godot_cpp/classes/gltf_document_extension.hpp>
 #include <godot_cpp/classes/gltf_mesh.hpp>
+#include <godot_cpp/classes/mesh.hpp>
+#include <godot_cpp/classes/array_mesh.hpp>
+#include <godot_cpp/classes/gltf_buffer_view.hpp>
 
+#include <src/decoder.h>
 #include <draco/compression/decode.h>
 #include <draco/compression/mesh/mesh_decoder.h>
 #include <draco/core/decoder_buffer.h>
 #include <draco/mesh/mesh.h>
+#include <draco/core/status.h>
+#include <draco/point_cloud/point_cloud.h>
 
 namespace godot {
     class GDDraco: public GLTFDocumentExtension {
@@ -28,6 +34,8 @@ namespace godot {
             Error _import_preflight(const Ref<GLTFState> &p_state, const PackedStringArray &p_extensions) override;
 
             PackedStringArray _get_supported_extensions();
+
+            Ref<Mesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_data);
     };
 }
 
