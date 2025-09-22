@@ -6,6 +6,11 @@
 #include <godot_cpp/classes/gltf_document_extension.hpp>
 #include <godot_cpp/classes/gltf_mesh.hpp>
 
+#include <draco/compression/decode.h>
+#include <draco/compression/mesh/mesh_decoder.h>
+#include <draco/core/decoder_buffer.h>
+#include <draco/mesh/mesh.h>
+
 namespace godot {
     class GDDraco: public GLTFDocumentExtension {
         GDCLASS(GDDraco,GLTFDocumentExtension);

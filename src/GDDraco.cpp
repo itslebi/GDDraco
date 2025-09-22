@@ -20,6 +20,7 @@ Error GDDraco::_parse_node_extensions(const Ref<GLTFState> &p_state, const Ref<G
     if (p_extensions.has("KHR_draco_mesh_compression")) {
         UtilityFunctions::print("Found KHR_draco_mesh_compression on node!");
         // Implement your logic here
+        
         return OK;
     }
 
