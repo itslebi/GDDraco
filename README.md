@@ -384,85 +384,108 @@ gltf_mesh->set_mesh(decoded_mesh); // Plug in the decoded mesh
 
 It builds the final Godot scene from the GLTFNode tree.
 
-For each node with a mesh, it creates a Node3D (usually MeshInstance3D) and attaches the mesh.
+________________
 
-🏗️ Where is the node added? What’s the full flow?
+## 🔍 What is `_import_preflight()` for?
 
-Here’s the typical Godot GLTF Import Pipeline:
+`_import_preflight()` allows an extension (like your `GDDraco` handler) to:
 
-1. Parsing Phase
+1. **Check if the GLTF file uses the extension** (e.g., `KHR_draco_mesh_compression`).
+2. **Prepare internal state**, if needed, before the rest of the GLTF is parsed.
+3. **Communicate capabilities or requirements** to the import process.
 
-GLTF JSON is parsed.
+This method is especially useful when:
 
-For each node, a GLTFNode object is created.
+* You need to **set up flags** that influence how later parsing happens.
+* You need to **allocate resources early**, or pre-validate data.
+* You want to **record that an extension is used** even if it's optional.
 
-Buffers, bufferViews, animations, skins, etc., are all parsed into intermediate data.
+---
 
-Draco extension (your code) is called during this phase, if present.
+## 🧠 Why do anything here for `KHR_draco_mesh_compression`?
 
-2. Mesh Decoding Phase
+The GLTF spec defines `KHR_draco_mesh_compression` as a **mesh-level compression extension**. If it's used in the file, you want to be ready for it.
 
-Meshes are parsed (Draco or raw).
+So in this function:
 
-Your code runs here if the mesh is Draco-compressed.
+```cpp
+Error GDDraco::_import_preflight(const Ref<GLTFState> &p_state, const PackedStringArray &p_extensions) {
+    if (p_extensions.has("KHR_draco_mesh_compression")) {
+        // Maybe set a flag in the GLTFState custom state
+    }
+    return OK;
+}
+```
 
-The resulting Mesh is stored in a GLTFMesh resource.
+You should use it to **mark that Draco decoding will be needed later**. That way, your `_parse_node_extensions` or `_parse_mesh` functions can act accordingly.
 
-Shape keys (morph targets) are parsed and attached to GLTFMesh.
+---
 
-3. Scene Construction Phase
+## ✅ What should be done here?
 
-The parsed GLTFNodes are turned into actual Godot Node3Ds.
+### ✅ Set a custom flag in the `GLTFState` to mark Draco usage.
 
-Meshes go into MeshInstance3Ds.
+The `GLTFState` object has a `Dictionary` field called `custom_data` specifically for this purpose.
 
-Skins go into Skeleton3Ds.
+### Example:
 
-Materials are assigned to mesh surfaces.
+```cpp
+Error GDDraco::_import_preflight(const Ref<GLTFState> &p_state, const PackedStringArray &p_extensions) {
+    if (p_extensions.has("KHR_draco_mesh_compression")) {
+        Dictionary custom = p_state->get_custom_data();
+        custom["use_draco"] = true;
+        p_state->set_custom_data(custom);
+    }
+    return OK;
+}
+```
 
-Animations become AnimationPlayer nodes.
+---
 
-Everything is parented properly in the node tree.
+## 🧭 Why set `use_draco` in `custom_data`?
 
-🔄 Your Draco-decoded mesh ends up in this final scene via the GLTFMesh attached to a GLTFNode.
+* ✅ Lets you avoid rechecking the extension everywhere later.
+* ✅ Allows you to **skip Draco-related parsing** if the flag is not set.
+* ✅ Keeps your parsing logic cleaner and centralized.
+* ✅ Can be used in `_parse_mesh`, `_parse_node_extensions`, etc., to short-circuit logic.
 
-🧬 So what happens with complex GLTF files?
+---
 
-Let's say your GLB has:
+## 🧪 How is this used later?
 
-🧍‍♂️ A character rig (Skeleton)
+Later in `_parse_node_extensions`, you might do:
 
-🖼️ Multiple textures and materials
+```cpp
+Dictionary custom = p_state->get_custom_data();
+if (!custom.has("use_draco") || !bool(custom["use_draco"])) {
+    return ERR_SKIP;
+}
+```
 
-🔄 Animations (like walk/run)
+Or if you cache buffer indices or decoder settings in `custom_data`, you can read them later without having to reparse extension declarations.
 
-🧊 Meshes compressed with Draco
+---
 
-😮 Shape keys for facial animation
+## 🧩 Summary
 
-What happens during import:
-Feature	Handled by	Your Draco Code’s Role
-Meshes	GLTFMesh and GLTFNode	✅ You decode and assign the compressed mesh
-Materials	GLTFDocument material parser	❌ Separate
-Textures	GLTFDocument + GLTFTexture	❌ Separate
-Skeleton	GLTFSkin, GLTFNode, Skeleton3D	❌ Separate
-Animations	GLTFAnimation, AnimationPlayer	❌ Separate
-Shape Keys	GLTFMesh->morph_targets	❌ Your mesh must support them if needed
-Scene graph	GLTFNode tree	✅ Your node contributes by providing mesh
+| Purpose of `_import_preflight()` | What to do                               |
+| -------------------------------- | ---------------------------------------- |
+| Detect if the extension is used  | Check for `"KHR_draco_mesh_compression"` |
+| Prepare for decoding later       | Set a custom flag in `GLTFState`         |
+| Avoid redundancy or re-checks    | Store state like `custom["use_draco"]`   |
 
-So your code contributes one piece to the puzzle: decompressing and assigning the geometry.
+---
 
-🧩 Summary
+## 🛠 Recommended Code to Add
 
-The Draco parser only handles decompressing the mesh and assigning it to the GLTF node.
-
-The actual scene building (creating nodes in the Godot scene tree) happens later in the GLTF import process.
-
-You don’t manually “add” the node to the scene — instead, you populate the GLTFNode and GLTFMesh data, and the import system builds the final scene for you.
-
-Would you like to see an example of a full flow, or how you'd register this parser in a GLTFDocumentExtension?
-
-Anexar
-Procurar
-Estudar
-O ChatGPT pode cometer erros. Considere verificar informações importantes. Consulte a
+```cpp
+Error GDDraco::_import_preflight(const Ref<GLTFState> &p_state, const PackedStringArray &p_extensions) {
+    if (p_extensions.has("KHR_draco_mesh_compression")) {
+        Dictionary custom = p_state->get_custom_data();
+        custom["use_draco"] = true;
+        p_state->set_custom_data(custom);
+        UtilityFunctions::print("Draco extension detected in preflight.");
+    }
+    return OK;
+}
+```
