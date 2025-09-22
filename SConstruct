@@ -2,7 +2,8 @@ env = SConscript("godot-cpp/SConstruct")
 
 env.Append(CPPPATH=[
     "src/",
-    "include/draco/src"
+    "include/draco/src",
+    "include"
     ])
 
 sources = (

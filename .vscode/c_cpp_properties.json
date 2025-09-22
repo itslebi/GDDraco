@@ -4,7 +4,8 @@
             "name": "Win32",
             "includePath": [
                 "${workspaceFolder}/**",
-                "./godot-cpp/gen/**"
+                "./godot-cpp/gen/**",
+                "./include/**"
             ],
             "defines": [
                 "_DEBUG",
