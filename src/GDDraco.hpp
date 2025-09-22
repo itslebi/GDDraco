@@ -1,6 +1,8 @@
 #ifndef GD_DRACO_HPP
 #define GD_DRACO_HPP
 
+#include <godot_cpp/classes/gltf_node.hpp>
+#include <godot_cpp/classes/gltf_state.hpp>
 #include <godot_cpp/classes/gltf_document_extension.hpp>
 #include <godot_cpp/classes/gltf_mesh.hpp>
 
@@ -17,6 +19,10 @@ namespace godot {
     
             // Override this method to handle mesh compression
             Error _parse_node_extensions(const Ref<GLTFState> &p_state, const Ref<GLTFNode> &p_gltf_node, const Dictionary &p_extensions) override;
+
+            Error _import_preflight(const Ref<GLTFState> &p_state, const PackedStringArray &p_extensions) override;
+
+            PackedStringArray _get_supported_extensions();
     };
 }
 
