@@ -1,9 +1,10 @@
 #include "register.hpp"
-#include "file.hpp"
+#include "GDDraco.hpp"
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/defs.hpp>
 #include <godot_cpp/godot.hpp>
+#include <godot_cpp/classes/gltf_document.hpp>
 
 using namespace godot;
 
@@ -12,7 +13,8 @@ void initialize(ModuleInitializationLevel p_level) {
         return;
     }
 
-    GDREGISTER_CLASS(BoucySprite);
+    GDREGISTER_CLASS(GDDraco);
+    GLTFDocument::register_gltf_document_extension(memnew(GDDraco));
 }
 
 void uninitialize(ModuleInitializationLevel p_level) {
