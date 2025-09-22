@@ -354,3 +354,115 @@ You might also want to override:
 ---
 
 If you want, I can help you write full skeleton code for these functions and how to register your extension properly!
+
+__________________________________
+✅ How to attach the decoded mesh?
+
+After decoding:
+
+Ref<Mesh> decoded_mesh = decode_draco_mesh(draco_data);
+
+
+You attach it to the GLTFNode’s mesh reference:
+
+Ref<GLTFMesh> new_mesh;
+new_mesh.instantiate(); // Create a new GLTFMesh resource
+new_mesh->set_mesh(decoded_mesh); // Set the actual decoded Godot Mesh
+
+p_gltf_node->set_mesh(new_mesh);
+
+Or more commonly:
+
+If you already know the GLTFMesh is in the GLTF state (by mesh index), you could:
+
+int mesh_index = p_gltf_node->mesh; // index into GLTFState’s mesh array
+Ref<GLTFMesh> gltf_mesh = p_state->get_meshes()[mesh_index];
+gltf_mesh->set_mesh(decoded_mesh); // Plug in the decoded mesh
+
+
+🔁 Later, when the GLTFDocument finishes importing:
+
+It builds the final Godot scene from the GLTFNode tree.
+
+For each node with a mesh, it creates a Node3D (usually MeshInstance3D) and attaches the mesh.
+
+🏗️ Where is the node added? What’s the full flow?
+
+Here’s the typical Godot GLTF Import Pipeline:
+
+1. Parsing Phase
+
+GLTF JSON is parsed.
+
+For each node, a GLTFNode object is created.
+
+Buffers, bufferViews, animations, skins, etc., are all parsed into intermediate data.
+
+Draco extension (your code) is called during this phase, if present.
+
+2. Mesh Decoding Phase
+
+Meshes are parsed (Draco or raw).
+
+Your code runs here if the mesh is Draco-compressed.
+
+The resulting Mesh is stored in a GLTFMesh resource.
+
+Shape keys (morph targets) are parsed and attached to GLTFMesh.
+
+3. Scene Construction Phase
+
+The parsed GLTFNodes are turned into actual Godot Node3Ds.
+
+Meshes go into MeshInstance3Ds.
+
+Skins go into Skeleton3Ds.
+
+Materials are assigned to mesh surfaces.
+
+Animations become AnimationPlayer nodes.
+
+Everything is parented properly in the node tree.
+
+🔄 Your Draco-decoded mesh ends up in this final scene via the GLTFMesh attached to a GLTFNode.
+
+🧬 So what happens with complex GLTF files?
+
+Let's say your GLB has:
+
+🧍‍♂️ A character rig (Skeleton)
+
+🖼️ Multiple textures and materials
+
+🔄 Animations (like walk/run)
+
+🧊 Meshes compressed with Draco
+
+😮 Shape keys for facial animation
+
+What happens during import:
+Feature	Handled by	Your Draco Code’s Role
+Meshes	GLTFMesh and GLTFNode	✅ You decode and assign the compressed mesh
+Materials	GLTFDocument material parser	❌ Separate
+Textures	GLTFDocument + GLTFTexture	❌ Separate
+Skeleton	GLTFSkin, GLTFNode, Skeleton3D	❌ Separate
+Animations	GLTFAnimation, AnimationPlayer	❌ Separate
+Shape Keys	GLTFMesh->morph_targets	❌ Your mesh must support them if needed
+Scene graph	GLTFNode tree	✅ Your node contributes by providing mesh
+
+So your code contributes one piece to the puzzle: decompressing and assigning the geometry.
+
+🧩 Summary
+
+The Draco parser only handles decompressing the mesh and assigning it to the GLTF node.
+
+The actual scene building (creating nodes in the Godot scene tree) happens later in the GLTF import process.
+
+You don’t manually “add” the node to the scene — instead, you populate the GLTFNode and GLTFMesh data, and the import system builds the final scene for you.
+
+Would you like to see an example of a full flow, or how you'd register this parser in a GLTFDocumentExtension?
+
+Anexar
+Procurar
+Estudar
+O ChatGPT pode cometer erros. Considere verificar informações importantes. Consulte a
