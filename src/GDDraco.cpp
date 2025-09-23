@@ -8,10 +8,16 @@ void GDDraco::_bind_methods() {
     // No binding needed unless exposing to GDScript.
 }
 
-GDDraco::GDDraco() {}
-GDDraco::~GDDraco() {}
+GDDraco::GDDraco() {
+    UtilityFunctions::print("GDDraco constructor called");
+}
+GDDraco::~GDDraco() {
+    UtilityFunctions::print("GDDraco destructor called");
+}
 
 Error GDDraco::_import_preflight(const Ref<GLTFState> &p_state, const PackedStringArray &p_extensions) {
+    UtilityFunctions::print("GDDraco::_import_preflight called!");
+
     for (int i = 0; i < p_extensions.size(); ++i) {
         String ext = p_extensions[i];
         if (ext == "KHR_draco_mesh_compression") {
@@ -98,14 +104,114 @@ Error GDDraco::_parse_node_extensions(const Ref<GLTFState> &p_state, const Ref<G
     return OK;
 }
 
+Ref<GLTFObjectModelProperty> GDDraco::_import_object_model_property(const Ref<GLTFState> &p_state, const PackedStringArray &p_split_json_pointer, const TypedArray<NodePath> &p_partial_paths) {
+    UtilityFunctions::print("GDDraco::_import_object_model_property called!");
+    // Look for JSON pointer like: ["meshes", "0", "primitives", "0", "extensions", "KHR_draco_mesh_compression"]
+    if (p_split_json_pointer.size() >= 6 &&
+        p_split_json_pointer[0] == "meshes" &&
+        p_split_json_pointer[2] == "primitives" &&
+        p_split_json_pointer[4] == "extensions" &&
+        p_split_json_pointer[5] == "KHR_draco_mesh_compression") {
+
+        // parse mesh and primitive indices
+        int mesh_index = 0;
+        int prim_index = 0;
+        // p_split_json_pointer[1] is a StringName or String?
+        // If it's StringName, convert or do it via .c_str()
+        mesh_index = int(String(p_split_json_pointer[1]).to_int());
+        prim_index = int(String(p_split_json_pointer[3]).to_int());
+
+        String key = vformat("draco_ext_mesh_%d_prim_%d", mesh_index, prim_index);
+
+        // Create property
+        Ref<GLTFObjectModelProperty> prop;
+        prop.instantiate();  // ensure it's non-null
+        
+        prop->set_object_model_type(GLTFObjectModelProperty::GLTF_OBJECT_MODEL_TYPE_UNKNOWN);
+
+        // If available: set JSON pointers so Godot knows which JSON this property refers to
+        TypedArray<PackedStringArray> pointers_array;
+        pointers_array.append(p_split_json_pointer);
+
+        prop->set_json_pointers(pointers_array);
+        // If available: map to node paths so Godot knows which node in scene this relates to
+        // partial_paths may contain node path
+        prop->set_node_paths(p_partial_paths);
+
+        return prop;
+    }
+
+    // return null (empty Ref) if not interested
+    return Ref<GLTFObjectModelProperty>();
+}
+
+Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
+    UtilityFunctions::print("GDDraco::_import_post_parse called!");
+
+    TypedArray<Ref<GLTFMesh>> meshes = p_state->get_meshes();
+    for (int i = 0; i < meshes.size(); i++) {
+        Ref<GLTFMesh> mesh = meshes[i];
+        if (mesh.is_null()) continue;
+
+        // Get buffer views from GLTFState
+        TypedArray<Ref<GLTFBufferView>> buffer_views = p_state->get_buffer_views();
+        Ref<GLTFBufferView> buffer_view = buffer_views[0]; //It is probably 0 who knows!
+
+        int buffer_index = buffer_view->get_buffer();
+        int byte_offset = buffer_view->get_byte_offset();
+        int byte_length = buffer_view->get_byte_length();
+
+        // Get buffers from GLTFState
+        TypedArray<PackedByteArray> buffers = p_state->get_buffers();
+        if (buffer_index < 0 || buffer_index >= buffers.size()) {
+            UtilityFunctions::printerr("buffer index out of range");
+            return ERR_INVALID_PARAMETER;
+        }
+
+        PackedByteArray buffer = buffers[buffer_index];
+
+        if (byte_offset < 0 || byte_offset + byte_length > buffer.size()) {
+            UtilityFunctions::printerr("bufferView range invalid");
+            return ERR_INVALID_PARAMETER;
+        }
+
+        // Extract the compressed Draco bytes from buffer
+        PackedByteArray draco_data;
+        draco_data.resize(byte_length);
+        memcpy(draco_data.ptrw(), buffer.ptr() + byte_offset, byte_length);
+
+        UtilityFunctions::print("Draco compressed data size: ", draco_data.size());
+
+        // Get the Decoded Mesh from decode_draco_mesh
+        Ref<Mesh> decoded_mesh = decode_draco_mesh(draco_data);
+        if (decoded_mesh.is_null()) {
+            UtilityFunctions::printerr("Failed to decode Draco mesh");
+            return ERR_CANT_CREATE;
+        }
+        UtilityFunctions::print("Decoded mesh is null? ", decoded_mesh.is_null());
+        UtilityFunctions::print("Surface count: ", decoded_mesh->get_surface_count());
+
+        //Set the mesh to the decoded version
+        Ref<GLTFMesh> gltf_mesh = meshes[i];
+        gltf_mesh->set_mesh(decoded_mesh);
+    }
+
+    return OK;
+}
+
 PackedStringArray GDDraco::_get_supported_extensions() {
+    UtilityFunctions::print("GDDraco::_get_supported_extensions called!");
+
     PackedStringArray extensions;
     extensions.append("KHR_draco_mesh_compression");
+    UtilityFunctions::print(extensions);
     return extensions;
 }
 
 
 Ref<Mesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_data) {
+    UtilityFunctions::print("GDDraco::decode_draco_mesh called!");
+
     Decoder* decoder = decoderCreate();
     if (!decoderDecode(decoder, (void*)compressed_data.ptr(), compressed_data.size())) {
         UtilityFunctions::printerr("Failed to decode Draco mesh");
