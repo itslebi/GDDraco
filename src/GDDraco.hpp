@@ -31,10 +31,13 @@ namespace godot {
             // Override this method to handle mesh compression
             Error _parse_node_extensions(const Ref<GLTFState> &p_state, const Ref<GLTFNode> &p_gltf_node, const Dictionary &p_extensions) override;
 
+            //Used to determine if my extension should be used by GLTF Importer or not
             Error _import_preflight(const Ref<GLTFState> &p_state, const PackedStringArray &p_extensions) override;
 
+            //Tell Godot that KHR_draco_mesh_compression is supported
             PackedStringArray _get_supported_extensions();
 
+            //Custom method to connect with Draco Decoder from the Draco Wrapper
             Ref<Mesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_data);
     };
 }

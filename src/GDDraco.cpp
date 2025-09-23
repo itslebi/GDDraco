@@ -16,6 +16,17 @@ GDDraco::~GDDraco() {
 
 }
 
+Error GDDraco::_import_preflight(const Ref<GLTFState> &p_state, const PackedStringArray &p_extensions) {
+    for (int i = 0; i < p_extensions.size(); ++i) {
+        String ext = p_extensions[i];
+        if (ext == "KHR_draco_mesh_compression") {
+            return OK; // Proceed with Draco decoding
+        }
+    }
+
+    return ERR_SKIP; // Skip processing if Draco is not used
+}
+
 Error GDDraco::_parse_node_extensions(const Ref<GLTFState> &p_state, const Ref<GLTFNode> &p_gltf_node, const Dictionary &p_extensions) {
     UtilityFunctions::print("GDDraco::_parse_node_extensions called!");
 
@@ -76,14 +87,6 @@ Error GDDraco::_parse_node_extensions(const Ref<GLTFState> &p_state, const Ref<G
     // TODO: attach decoded_mesh to p_gltf_node or the scene graph as needed
 
     UtilityFunctions::print("Draco mesh decoded successfully");
-    return OK;
-}
-
-
-Error GDDraco::_import_preflight(const Ref<GLTFState> &p_state, const PackedStringArray &p_extensions) {
-    if (p_extensions.has("KHR_draco_mesh_compression")) {
-        // Maybe set a flag in the GLTFState custom state
-    }
     return OK;
 }
 
@@ -159,3 +162,4 @@ Ref<Mesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_data) {
     decoderRelease(decoder);
     return mesh;
 }
+
