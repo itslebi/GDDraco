@@ -387,4 +387,127 @@ To finish the job:
 * Update the `GLTFState` properly after adding new mesh(es).
 
 Would you like a complete working version of `_parse_node_extensions()` with these improvements built in?
+____________
+#include "draco/core/decoder_buffer.h"
+#include "draco/mesh/mesh.h"
+#include "draco/point_cloud/point_cloud.h"
+#include "draco/compression/decode.h"
+
+// Suppose buffer_data points to Draco‐encoded bytes, buffer_size is size_t
+
+bool decode_draco_primitive(
+    const uint8_t *buffer_data,
+    size_t buffer_size,
+    /* outputs: */ 
+    std::vector<float> &out_positions,
+    std::vector<float> &out_normals,        // if present
+    std::vector<float> &out_uvs,            // if present
+    std::vector<uint32_t> &out_indices      // if mesh
+) {
+    draco::DecoderBuffer buffer;
+    buffer.Init(buffer_data, buffer_size);
+    
+    draco::EncodedGeometryType geom_type = draco::Decoder::GetEncodedGeometryType(&buffer);
+    if (geom_type == draco::TRIANGULAR_MESH) {
+        auto status_or_mesh = draco::DecodeMeshFromBuffer(&buffer);
+        if (!status_or_mesh.ok()) {
+            // handle error: decoding failed
+            return false;
+        }
+        std::unique_ptr<draco::Mesh> mesh = std::move(status_or_mesh).value();
+        
+        const int num_points = mesh->num_points();
+        const int num_faces = mesh->num_faces();
+        
+        // Positions
+        const auto *pos_att = mesh->GetNamedAttribute(draco::GeometryAttribute::POSITION);
+        if (!pos_att) {
+            // no positions? weird
+            return false;
+        }
+        draco::PointAttribute *pa = pos_att;
+        
+        out_positions.resize(num_points * 3);
+        for (int i = 0; i < num_points; ++i) {
+            draco::AttributeValueIndex avi = pa->mapped_index(i);
+            // Note: you might want to use pa->GetValue(avi, &...) or pa->ConvertValue...
+            draco::AttributeValueIndex value_index = pa->mapped_index(i);
+            std::array<float,3> pos;
+            pa->ConvertValue<float,3>(value_index, pos.data());
+            out_positions[3 * i + 0] = pos[0];
+            out_positions[3 * i + 1] = pos[1];
+            out_positions[3 * i + 2] = pos[2];
+        }
+        
+        // Indices (faces)
+        out_indices.reserve(num_faces * 3);
+        for (int f = 0; f < num_faces; ++f) {
+            draco::Mesh::Face face = mesh->face(f);
+            out_indices.push_back(face[0]);
+            out_indices.push_back(face[1]);
+            out_indices.push_back(face[2]);
+        }
+        
+        // Normals, UVs etc. attributes — similar
+        auto norm_att = mesh->GetNamedAttribute(draco::GeometryAttribute::NORMAL);
+        if (norm_att) {
+            out_normals.resize(num_points * 3);
+            for (int i = 0; i < num_points; ++i) {
+                auto v = norm_att->mapped_index(i);
+                std::array<float,3> n;
+                norm_att->ConvertValue<float,3>(v, n.data());
+                out_normals[3 * i + 0] = n[0];
+                out_normals[3 * i + 1] = n[1];
+                out_normals[3 * i + 2] = n[2];
+            }
+        }
+        
+        auto uv_att = mesh->GetNamedAttribute(draco::GeometryAttribute::TEX_COORD);
+        if (uv_att) {
+            // assuming 2D UV
+            out_uvs.resize(num_points * 2);
+            for (int i = 0; i < num_points; ++i) {
+                auto v = uv_att->mapped_index(i);
+                std::array<float,2> uv;
+                // note: ConvertValue might need template <float,2> etc
+                uv_att->ConvertValue<float,2>(v, uv.data());
+                out_uvs[2 * i + 0] = uv[0];
+                out_uvs[2 * i + 1] = uv[1];
+            }
+        }
+        
+        return true;
+    }
+    else if (geom_type == draco::POINT_CLOUD) {
+        auto status_or_pc = draco::DecodePointCloudFromBuffer(&buffer);
+        if (!status_or_pc.ok()) {
+            return false;
+        }
+        std::unique_ptr<draco::PointCloud> pc = std::move(status_or_pc).value();
+        const int num_points = pc->num_points();
+        
+        // Positions
+        const auto *pos_att = pc->GetNamedAttribute(draco::GeometryAttribute::POSITION);
+        if (!pos_att) {
+            return false;
+        }
+        out_positions.resize(num_points * 3);
+        for (int i = 0; i < num_points; ++i) {
+            auto v = pos_att->mapped_index(i);
+            std::array<float,3> pos;
+            pos_att->ConvertValue<float,3>(v, pos.data());
+            out_positions[3 * i + 0] = pos[0];
+            out_positions[3 * i + 1] = pos[1];
+            out_positions[3 * i + 2] = pos[2];
+        }
+        
+        // Probably no indices
+        out_indices.clear();
+        return true;
+    }
+    else {
+        // unsupported type
+        return false;
+    }
+}
 
