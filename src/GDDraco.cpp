@@ -5,7 +5,7 @@
 using namespace godot;
 
 void GDDraco::_bind_methods() {
-
+    // No binding needed unless exposing to GDScript.
 }
 
 GDDraco::GDDraco() {
