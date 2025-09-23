@@ -4,19 +4,19 @@
 #include <godot_cpp/classes/gltf_node.hpp>
 #include <godot_cpp/classes/gltf_state.hpp>
 #include <godot_cpp/classes/gltf_document_extension.hpp>
+#include <godot_cpp/classes/gltf_object_model_property.hpp>
 #include <godot_cpp/classes/gltf_mesh.hpp>
 #include <godot_cpp/classes/mesh.hpp>
 #include <godot_cpp/classes/importer_mesh.hpp>
 #include <godot_cpp/classes/array_mesh.hpp>
 #include <godot_cpp/classes/gltf_buffer_view.hpp>
+#include <godot_cpp/variant/variant.hpp>
+
+#include <godot_cpp/classes/node3d.hpp>
+#include <godot_cpp/classes/gltf_texture.hpp>
+#include <godot_cpp/classes/image.hpp>
 
 #include <src/decoder.h>
-#include <draco/compression/decode.h>
-#include <draco/compression/mesh/mesh_decoder.h>
-#include <draco/core/decoder_buffer.h>
-#include <draco/mesh/mesh.h>
-#include <draco/core/status.h>
-#include <draco/point_cloud/point_cloud.h>
 
 namespace godot {
     class GDDraco: public GLTFDocumentExtension {
@@ -28,8 +28,12 @@ namespace godot {
         public:
             GDDraco();
             ~GDDraco();
+
+            Error _import_post_parse(const Ref<GLTFState> &p_state) override;
+
+            Ref<GLTFObjectModelProperty> _import_object_model_property(const Ref<GLTFState> &p_state, const PackedStringArray &p_split_json_pointer, const TypedArray<NodePath> &p_partial_paths) override;
     
-            // Override this method to handle mesh compression
+            // Override this method to handle mesh compression ???????????
             Error _parse_node_extensions(const Ref<GLTFState> &p_state, const Ref<GLTFNode> &p_gltf_node, const Dictionary &p_extensions) override;
 
             //Used to determine if my extension should be used by GLTF Importer or not
