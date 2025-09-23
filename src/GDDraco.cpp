@@ -212,6 +212,10 @@ PackedStringArray GDDraco::_get_supported_extensions() {
 Ref<Mesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_data) {
     UtilityFunctions::print("GDDraco::decode_draco_mesh called!");
 
+    // Use ComponentType enum values
+    const size_t component_type_float = 5126;       // Float
+    const size_t component_type_uint = 5125;        // UnsignedInt
+
     Decoder* decoder = decoderCreate();
     if (!decoderDecode(decoder, (void*)compressed_data.ptr(), compressed_data.size())) {
         UtilityFunctions::printerr("Failed to decode Draco mesh");
@@ -226,9 +230,15 @@ Ref<Mesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_data) {
     uint32_t position_attribute_id = 0;
 
     size_t position_byte_length = decoderGetAttributeByteLength(decoder, position_attribute_id);
+    if (position_byte_length == 0) {
+        UtilityFunctions::printerr("Position attribute byte length is zero");
+        decoderRelease(decoder);
+        return Ref<Mesh>();
+    }
+
     float* position_data = (float*)malloc(position_byte_length);
 
-    if (!decoderReadAttribute(decoder, position_attribute_id, /*componentType=*/sizeof(float), "FLOAT")) {
+    if (!decoderReadAttribute(decoder, position_attribute_id, component_type_float, const_cast<char*>("FLOAT"))) {
         UtilityFunctions::printerr("Failed to read position attribute");
         std::free(position_data);
         decoderRelease(decoder);
@@ -246,11 +256,18 @@ Ref<Mesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_data) {
 
     std::free(position_data);
 
-    // Read indices similarly:
+    // Indices
+
     size_t indices_byte_length = decoderGetIndicesByteLength(decoder);
+    if (indices_byte_length == 0) {
+        UtilityFunctions::printerr("Indices byte length is zero");
+        decoderRelease(decoder);
+        return Ref<Mesh>();
+    }
+
     uint32_t* index_data = (uint32_t*)malloc(indices_byte_length);
 
-    if (!decoderReadIndices(decoder, sizeof(uint32_t))) {
+    if (!decoderReadIndices(decoder, component_type_uint)) {
         UtilityFunctions::printerr("Failed to read indices");
         std::free(index_data);
         decoderRelease(decoder);
