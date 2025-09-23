@@ -8,13 +8,8 @@ void GDDraco::_bind_methods() {
     // No binding needed unless exposing to GDScript.
 }
 
-GDDraco::GDDraco() {
-
-}
-
-GDDraco::~GDDraco() {
-
-}
+GDDraco::GDDraco() {}
+GDDraco::~GDDraco() {}
 
 Error GDDraco::_import_preflight(const Ref<GLTFState> &p_state, const PackedStringArray &p_extensions) {
     for (int i = 0; i < p_extensions.size(); ++i) {
@@ -77,14 +72,27 @@ Error GDDraco::_parse_node_extensions(const Ref<GLTFState> &p_state, const Ref<G
 
     UtilityFunctions::print("Draco compressed data size: ", draco_data.size());
 
-    // TODO: pass draco_data to your Draco decoder here
+    // Get the Decoded Mesh from decode_draco_mesh
     Ref<Mesh> decoded_mesh = decode_draco_mesh(draco_data);
     if (decoded_mesh.is_null()) {
         UtilityFunctions::printerr("Failed to decode Draco mesh");
         return ERR_CANT_CREATE;
     }
+    UtilityFunctions::print("Decoded mesh is null? ", decoded_mesh.is_null());
+    UtilityFunctions::print("Surface count: ", decoded_mesh->get_surface_count());
 
     // TODO: attach decoded_mesh to p_gltf_node or the scene graph as needed
+    int mesh_index = p_gltf_node->get_mesh();
+
+    TypedArray<Ref<GLTFMesh>> meshes = p_state->get_meshes();
+
+    if (mesh_index >= 0 && mesh_index < meshes.size()) {
+        Ref<GLTFMesh> gltf_mesh = meshes[mesh_index];
+        gltf_mesh->set_mesh(decoded_mesh);
+    } else {
+        UtilityFunctions::printerr("Failed to attach decoded mesh");
+        return ERR_CANT_CREATE;
+    }
 
     UtilityFunctions::print("Draco mesh decoded successfully");
     return OK;
@@ -105,50 +113,55 @@ Ref<Mesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_data) {
         return Ref<Mesh>();
     }
 
-    // Extract vertex count and index count
     uint32_t vertex_count = decoderGetVertexCount(decoder);
     uint32_t index_count = decoderGetIndexCount(decoder);
 
-    // TODO: You need to figure out component types from GLTF accessor info (e.g., float for positions)
-    // For example, positions, normals, uvs might be floats, indices usually unsigned short or uint32
+    // Assume POSITION attribute id = 0
+    uint32_t position_attribute_id = 0;
 
-    // Allocate arrays for vertices and indices
-    PackedVector3Array vertices;
-    vertices.resize(vertex_count);
+    size_t position_byte_length = decoderGetAttributeByteLength(decoder, position_attribute_id);
+    float* position_data = (float*)malloc(position_byte_length);
 
-    PackedInt32Array indices;
-    indices.resize(index_count);
-
-    // Assuming you know attribute ids for POSITION and indices component type
-    // For POSITION attribute:
-    uint32_t position_attribute_id = 0; // Replace with real ID from Draco mesh
-    if (!decoderReadAttribute(decoder, position_attribute_id, ComponentType::Float, "FLOAT")) {
+    if (!decoderReadAttribute(decoder, position_attribute_id, /*componentType=*/sizeof(float), "FLOAT")) {
         UtilityFunctions::printerr("Failed to read position attribute");
+        std::free(position_data);
         decoderRelease(decoder);
         return Ref<Mesh>();
     }
 
-    // Copy decoded position data into vertices array
-    // Your decoder stores raw bytes, cast and copy accordingly
-    float* position_data = (float*)malloc(sizeof(float) * vertex_count * 3);
     decoderCopyAttribute(decoder, position_attribute_id, position_data);
 
+    PackedVector3Array vertices;
+    vertices.resize(vertex_count);
+
     for (uint32_t i = 0; i < vertex_count; ++i) {
-        vertices[i] = Vector3(position_data[i * 3], position_data[i * 3 + 1], position_data[i * 3 + 2]);
+        vertices[i] = Vector3(position_data[i*3], position_data[i*3 + 1], position_data[i*3 + 2]);
     }
+
     std::free(position_data);
 
-    // Similarly for indices:
-    // For example, assuming indices are unsigned int
-    decoderReadIndices(decoder, ComponentType::UnsignedInt);
-    uint32_t* index_data = (uint32_t*)malloc(sizeof(uint32_t) * index_count);
+    // Read indices similarly:
+    size_t indices_byte_length = decoderGetIndicesByteLength(decoder);
+    uint32_t* index_data = (uint32_t*)malloc(indices_byte_length);
+
+    if (!decoderReadIndices(decoder, sizeof(uint32_t))) {
+        UtilityFunctions::printerr("Failed to read indices");
+        std::free(index_data);
+        decoderRelease(decoder);
+        return Ref<Mesh>();
+    }
+
     decoderCopyIndices(decoder, index_data);
+
+    PackedInt32Array indices;
+    indices.resize(index_count);
     for (uint32_t i = 0; i < index_count; ++i) {
         indices[i] = index_data[i];
     }
+
     std::free(index_data);
 
-    // Create Godot ArrayMesh and fill with data
+    // Create Godot mesh
     Ref<ArrayMesh> mesh;
     mesh.instantiate();
 
@@ -162,4 +175,3 @@ Ref<Mesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_data) {
     decoderRelease(decoder);
     return mesh;
 }
-
