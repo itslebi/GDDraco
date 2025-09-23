@@ -15,6 +15,7 @@ void initialize(ModuleInitializationLevel p_level) {
 
     GDREGISTER_CLASS(GDDraco);
     GLTFDocument::register_gltf_document_extension(memnew(GDDraco));
+    UtilityFunctions::print("Register Types");
 }
 
 void uninitialize(ModuleInitializationLevel p_level) {

@@ -6,6 +6,7 @@
 #include <godot_cpp/classes/gltf_document_extension.hpp>
 #include <godot_cpp/classes/gltf_mesh.hpp>
 #include <godot_cpp/classes/mesh.hpp>
+#include <godot_cpp/classes/importer_mesh.hpp>
 #include <godot_cpp/classes/array_mesh.hpp>
 #include <godot_cpp/classes/gltf_buffer_view.hpp>
 
