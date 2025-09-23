@@ -39,32 +39,3 @@ const draco::Mesh &mesh = maybe_geometry.value();
 ```
 
 Then extract attributes and create a `MeshData` or feed into `GLTFDocument`.
-
-_____________________________________________________________________________________________________
-✅ How to attach the decoded mesh?
-
-After decoding:
-
-Ref<Mesh> decoded_mesh = decode_draco_mesh(draco_data);
-
-
-You attach it to the GLTFNode’s mesh reference:
-
-Ref<GLTFMesh> new_mesh;
-new_mesh.instantiate(); // Create a new GLTFMesh resource
-new_mesh->set_mesh(decoded_mesh); // Set the actual decoded Godot Mesh
-
-p_gltf_node->set_mesh(new_mesh);
-
-Or more commonly:
-
-If you already know the GLTFMesh is in the GLTF state (by mesh index), you could:
-
-int mesh_index = p_gltf_node->mesh; // index into GLTFState’s mesh array
-Ref<GLTFMesh> gltf_mesh = p_state->get_meshes()[mesh_index];
-gltf_mesh->set_mesh(decoded_mesh); // Plug in the decoded mesh
-
-
-🔁 Later, when the GLTFDocument finishes importing:
-
-It builds the final Godot scene from the GLTFNode tree.
