@@ -49,7 +49,7 @@ namespace godot {
             Ref<Mesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_data);
         
         private:
-            bool is_png(const uint8_t* buffer, size_t size);
+            bool is_png_from_buffer_view(const PackedByteArray &buffer, const Ref<GLTFState> &p_state);
     };
 }
 

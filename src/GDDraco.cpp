@@ -148,52 +148,47 @@ Ref<GLTFObjectModelProperty> GDDraco::_import_object_model_property(const Ref<GL
 Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
     UtilityFunctions::print("GDDraco::_import_post_parse called!");
 
-    TypedArray<Ref<GLTFMesh>> meshes = p_state->get_meshes();
-    for (int i = 0; i < meshes.size(); i++) {
-        Ref<GLTFMesh> mesh = meshes[i];
-        if (mesh.is_null()) continue;
+    // Get buffer views from GLTFState
+    TypedArray<Ref<GLTFBufferView>> buffer_views = p_state->get_buffer_views();
 
-        // Get buffer views from GLTFState
-        TypedArray<Ref<GLTFBufferView>> buffer_views = p_state->get_buffer_views();
-        Ref<GLTFBufferView> buffer_view = buffer_views[0]; //It is probably 0 who knows!
+    //Iterate through all of the buffers and skip the ones that are for PNGs
+    for (int i = 0; i < buffer_views.size(); i++) {
+        Ref<GLTFBufferView> buffer_view = buffer_views[i];
 
         int buffer_index = buffer_view->get_buffer();
         int byte_offset = buffer_view->get_byte_offset();
         int byte_length = buffer_view->get_byte_length();
 
-        // Get buffers from GLTFState
-        TypedArray<PackedByteArray> buffers = p_state->get_buffers();
-        if (buffer_index < 0 || buffer_index >= buffers.size()) {
-            UtilityFunctions::printerr("buffer index out of range");
-            return ERR_INVALID_PARAMETER;
-        }
-
-        PackedByteArray buffer = buffers[buffer_index];
-
+        //Verify if buffer is valid
+        PackedByteArray buffer = buffer_view->load_buffer_view_data(p_state);
         if (byte_offset < 0 || byte_offset + byte_length > buffer.size()) {
             UtilityFunctions::printerr("bufferView range invalid");
             return ERR_INVALID_PARAMETER;
         }
+        if (!is_png_from_buffer_view(buffer, p_state)) {
+            UtilityFunctions::print("Found a mesh!");
 
-        // Extract the compressed Draco bytes from buffer
-        PackedByteArray draco_data;
-        draco_data.resize(byte_length);
-        memcpy(draco_data.ptrw(), buffer.ptr() + byte_offset, byte_length);
+            // Extract the compressed Draco bytes from buffer
+            PackedByteArray draco_data;
+            draco_data.resize(byte_length);
+            memcpy(draco_data.ptrw(), buffer.ptr() + byte_offset, byte_length);
 
-        UtilityFunctions::print("Draco compressed data size: ", draco_data.size());
+            UtilityFunctions::print("Draco compressed data size: ", draco_data.size());
 
-        // Get the Decoded Mesh from decode_draco_mesh
-        Ref<Mesh> decoded_mesh = decode_draco_mesh(draco_data);
-        if (decoded_mesh.is_null()) {
-            UtilityFunctions::printerr("Failed to decode Draco mesh");
-            return ERR_CANT_CREATE;
+            // Get the Decoded Mesh from decode_draco_mesh
+            Ref<Mesh> decoded_mesh = decode_draco_mesh(draco_data);
+            if (decoded_mesh.is_null()) {
+                UtilityFunctions::printerr("Failed to decode Draco mesh");
+                return ERR_CANT_CREATE;
+            }
+            UtilityFunctions::print("Decoded mesh is null? ", decoded_mesh.is_null());
+            UtilityFunctions::print("Surface count: ", decoded_mesh->get_surface_count());
+
+            //Set the mesh to the decoded version ???
+            //Maybe set the buffer to the decoded buffer!!!
+        } else {
+            UtilityFunctions::print("Found an image!");
         }
-        UtilityFunctions::print("Decoded mesh is null? ", decoded_mesh.is_null());
-        UtilityFunctions::print("Surface count: ", decoded_mesh->get_surface_count());
-
-        //Set the mesh to the decoded version
-        Ref<GLTFMesh> gltf_mesh = meshes[i];
-        gltf_mesh->set_mesh(decoded_mesh);
     }
 
     return OK;
@@ -299,13 +294,19 @@ Ref<Mesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_data) {
     return mesh;
 }
 
-bool is_png(const uint8_t* buffer, size_t size) {
-    const uint8_t png_signature[8] = {
-        0x89, 0x50, 0x4E, 0x47, // ‰PNG
-        0x0D, 0x0A, 0x1A, 0x0A  // \r\n\x1A\n
-    };
+bool GDDraco::is_png_from_buffer_view(const PackedByteArray &buffer, const Ref<GLTFState> &p_state) {
+    const uint8_t png_signature[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
 
-    if (size < 8) return false;
+    // Check size first
+    if (buffer.size() < 8) {
+        return false;
+    }
 
-    return std::memcmp(buffer, png_signature, 8) == 0;
+    // Compare first 8 bytes
+    for (int i = 0; i < 8; ++i) {
+        if (buffer[i] != png_signature[i]) {
+            return false;
+        }
+    }
+    return true;
 }
