@@ -18,6 +18,9 @@
 
 #include <src/decoder.h>
 
+#include <cstdint>
+#include <cstring>
+
 namespace godot {
     class GDDraco: public GLTFDocumentExtension {
         GDCLASS(GDDraco,GLTFDocumentExtension);
@@ -44,6 +47,9 @@ namespace godot {
 
             //Custom method to connect with Draco Decoder from the Draco Wrapper
             Ref<Mesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_data);
+        
+        private:
+            bool is_png(const uint8_t* buffer, size_t size);
     };
 }
 
