@@ -298,3 +298,14 @@ Ref<Mesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_data) {
     decoderRelease(decoder);
     return mesh;
 }
+
+bool is_png(const uint8_t* buffer, size_t size) {
+    const uint8_t png_signature[8] = {
+        0x89, 0x50, 0x4E, 0x47, // ‰PNG
+        0x0D, 0x0A, 0x1A, 0x0A  // \r\n\x1A\n
+    };
+
+    if (size < 8) return false;
+
+    return std::memcmp(buffer, png_signature, 8) == 0;
+}
