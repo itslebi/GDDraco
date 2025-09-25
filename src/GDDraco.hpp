@@ -45,7 +45,9 @@ namespace godot {
 
             Ref<ArrayMesh> decode_draco_primitive(const PackedByteArray &compressed_data);
 
-            Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buffer, int position_id, int normal_id, int uv_id, int joints_id, int weights_id, int indices_id);
+            Ref<ArrayMesh> decode_draco_mesh(const PackedByteArray &compressed_buffer, int position_id, int normal_id, int uv_id, int joints_id, int weights_id, int indices_id);
+
+            Ref<ImporterMesh> create_importer_mesh_from_array_mesh(const Ref<ArrayMesh> &source_mesh);
     };
 }
 
