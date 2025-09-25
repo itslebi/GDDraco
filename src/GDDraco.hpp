@@ -34,11 +34,6 @@ namespace godot {
 
             Error _import_post_parse(const Ref<GLTFState> &p_state) override;
 
-            Ref<GLTFObjectModelProperty> _import_object_model_property(const Ref<GLTFState> &p_state, const PackedStringArray &p_split_json_pointer, const TypedArray<NodePath> &p_partial_paths) override;
-    
-            // Override this method to handle mesh compression ???????????
-            Error _parse_node_extensions(const Ref<GLTFState> &p_state, const Ref<GLTFNode> &p_gltf_node, const Dictionary &p_extensions) override;
-
             //Used to determine if my extension should be used by GLTF Importer or not
             Error _import_preflight(const Ref<GLTFState> &p_state, const PackedStringArray &p_extensions) override;
 
@@ -49,9 +44,8 @@ namespace godot {
             Ref<Mesh> decode_draco_mesh(const PackedByteArray &compressed_data);
 
             Ref<ArrayMesh> decode_draco_primitive(const PackedByteArray &compressed_data);
-        
-        private:
-            bool is_png_from_buffer_view(const PackedByteArray &buffer, const Ref<GLTFState> &p_state);
+
+            Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buffer, int position_id, int normal_id, int uv_id, int joints_id, int weights_id, int indices_id);
     };
 }
 
