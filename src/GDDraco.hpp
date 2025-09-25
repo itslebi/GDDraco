@@ -46,7 +46,9 @@ namespace godot {
             PackedStringArray _get_supported_extensions();
 
             //Custom method to connect with Draco Decoder from the Draco Wrapper
-            Ref<Mesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_data);
+            Ref<Mesh> decode_draco_mesh(const PackedByteArray &compressed_data);
+
+            Ref<ArrayMesh> decode_draco_primitive(const PackedByteArray &compressed_data);
         
         private:
             bool is_png_from_buffer_view(const PackedByteArray &buffer, const Ref<GLTFState> &p_state);
