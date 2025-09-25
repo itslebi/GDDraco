@@ -127,8 +127,9 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
     positions.resize(static_cast<int64_t>(vertex_count));
     normals.resize(static_cast<int64_t>(vertex_count));
     uvs.resize(static_cast<int64_t>(vertex_count));
-    joints.resize(static_cast<int64_t>(vertex_count));
-    weights.resize(static_cast<int64_t>(vertex_count));
+    
+    const int64_t weight_element_count = static_cast<int64_t>(vertex_count) * 4;
+    weights.resize(weight_element_count);
 
     // Decode POSITION (required)
     if (!decoderReadAttribute(decoder, position_id, 5126, "VEC3")) {
@@ -157,11 +158,28 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
     }
 
     // Decode JOINTS_0 (optional)
-    /*if (joints_id >= 0 && decoderReadAttribute(decoder, joints_id, 5123, "VEC4")) {
-        decoderCopyAttribute(decoder, joints_id, joints.ptrw());
-    } else {
-        joints.resize(0);
+    //Get JOINTS to temporary memory
+    const int64_t joint_element_count = static_cast<int64_t>(vertex_count) * 4;
+
+    PackedByteArray raw_joint_data;
+    raw_joint_data.resize(joint_element_count * 2); // 2 bytes per uint16_t
+
+    if (!decoderReadAttribute(decoder, joints_id, 5123, "VEC4")) {
+        decoderRelease(decoder);
+        ERR_FAIL_COND_V_MSG(true, nullptr, "Failed to decode JOINTS_0 attribute");
     }
+    decoderCopyAttribute(decoder, joints_id, raw_joint_data.ptrw());
+
+    //Place joints on correct memory
+    joints.resize(joint_element_count);
+    const uint16_t *src_joint = reinterpret_cast<const uint16_t *>(raw_joint_data.ptr());
+    int32_t *dst = joints.ptrw();
+
+    for (int64_t i = 0; i < joint_element_count; i++) {
+        dst[i] = static_cast<int32_t>(src_joint[i]);
+    }
+
+
 
     // Decode WEIGHTS_0 (optional)
     if (weights_id >= 0 && decoderReadAttribute(decoder, weights_id, 5126, "VEC4")) {
@@ -183,17 +201,17 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
     PackedInt32Array indices;
     indices.resize(index_count);
 
-    const uint16_t *src = reinterpret_cast<const uint16_t *>(raw_indices_16.ptr());
+    const uint16_t *src_idx = reinterpret_cast<const uint16_t *>(raw_indices_16.ptr());
     for (uint32_t i = 0; i < index_count; ++i) {
-        indices[i] = static_cast<int32_t>(src[i]);
-    }*/
+        indices[i] = static_cast<int32_t>(src_idx[i]);
+    }
 
 
     decoderRelease(decoder);
 
     // Now create ArrayMesh
     Ref<ArrayMesh> mesh;
-    /*mesh.instantiate();
+    mesh.instantiate();
 
     Array arrays;
     arrays.resize(Mesh::ARRAY_MAX);
@@ -208,7 +226,7 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
         arrays[Mesh::ARRAY_WEIGHTS] = weights;
     arrays[Mesh::ARRAY_INDEX] = indices;
 
-    mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);*/
+    mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
 
     return mesh;
 }
