@@ -64,9 +64,17 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
         int weights_id = attributes["WEIGHTS_0"];
         int indices_id = primitive["indices"];
 
-        decode_draco_mesh(buffer, position_id, normal_id, uv_id, joints_id, weights_id, indices_id);
+        Ref<ArrayMesh> my_mesh = decode_draco_mesh(buffer, position_id, normal_id, uv_id, joints_id, weights_id, indices_id);
         UtilityFunctions::print("Mesh Decoded?");
 
+        TypedArray<Ref<GLTFMesh>> meshes_mesh = p_state->get_meshes();
+        if (i >= 0 && i < meshes_mesh.size()) {
+            Ref<ImporterMesh> importerMesh = create_importer_mesh_from_array_mesh(my_mesh);
+            UtilityFunctions::print("Created ImpoterMesh?");
+            Ref<GLTFMesh> mesh_to_change = meshes_mesh[i];
+            mesh_to_change->set_mesh(importerMesh);
+            UtilityFunctions::print("Mesh is set?");
+        }
     }
     
 
@@ -88,6 +96,47 @@ PackedStringArray GDDraco::_get_supported_extensions() {
     UtilityFunctions::print(extensions);
     return extensions;
 }
+
+Ref<ImporterMesh> GDDraco::create_importer_mesh_from_array_mesh(const Ref<ArrayMesh> &source_mesh) {
+	if (source_mesh.is_null()) {
+		return Ref<ImporterMesh>();
+	}
+
+	Ref<ImporterMesh> importer_mesh;
+	importer_mesh.instantiate();
+
+	const int surface_count = source_mesh->get_surface_count();
+
+	for (int i = 0; i < surface_count; ++i) {
+		// 1. Get surface data
+		Mesh::PrimitiveType primitive_type = source_mesh->surface_get_primitive_type(i);
+		Array arrays = source_mesh->surface_get_arrays(i);
+		Ref<Material> material = source_mesh->surface_get_material(i);
+
+		// 2. Optional: Get surface name if using names
+		String name;
+		if (source_mesh->surface_get_name(i) != String()) {
+			name = source_mesh->surface_get_name(i);
+		}
+
+		// 3. Optional: Get blend shapes if present
+		TypedArray<Array> blend_shapes; // TODO: extract blend shapes if needed
+
+		// 4. Add to ImporterMesh
+		importer_mesh->add_surface(
+			primitive_type,
+			arrays,
+			blend_shapes,
+			Dictionary(), // LODs – not used here
+			material,
+			name,
+			0 // flags
+		);
+	}
+
+	return importer_mesh;
+}
+
 
 
 Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buffer, int position_id, int normal_id, int uv_id, int joints_id, int weights_id, int indices_id) {
