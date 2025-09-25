@@ -148,6 +148,21 @@ Ref<GLTFObjectModelProperty> GDDraco::_import_object_model_property(const Ref<GL
 Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
     UtilityFunctions::print("GDDraco::_import_post_parse called!");
 
+    /*
+    I do not need to guess:
+    Dictionary json = {} 
+        void set_json(value: Dictionary)
+        Dictionary get_json()
+
+        The original raw JSON document corresponding to this GLTFState.
+
+
+    Acessors are required for the decoding:
+    Array[GLTFAccessor] get_accessors() 
+
+    https://github.com/blender/blender/blob/97297bd167aed7e05542fbbc85959365539f1e8b/scripts/addons_core/io_scene_gltf2/io/imp/gltf2_io_binary.py
+    */
+
     // Get buffer views from GLTFState
     TypedArray<Ref<GLTFBufferView>> buffer_views = p_state->get_buffer_views();
 
@@ -175,14 +190,12 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
 
             UtilityFunctions::print("Draco compressed data size: ", draco_data.size());
 
-            // Get the Decoded Mesh from decode_draco_mesh
-            Ref<Mesh> decoded_mesh = decode_draco_mesh(draco_data);
+            // Get the Decoded Primitive from decode_draco_mesh
+            Ref<ArrayMesh> decoded_mesh = decode_draco_primitive(draco_data);
             if (decoded_mesh.is_null()) {
                 UtilityFunctions::printerr("Failed to decode Draco mesh");
                 return ERR_CANT_CREATE;
             }
-            UtilityFunctions::print("Decoded mesh is null? ", decoded_mesh.is_null());
-            UtilityFunctions::print("Surface count: ", decoded_mesh->get_surface_count());
 
             //Set the mesh to the decoded version ???
             //Maybe set the buffer to the decoded buffer!!!
@@ -309,4 +322,109 @@ bool GDDraco::is_png_from_buffer_view(const PackedByteArray &buffer, const Ref<G
         }
     }
     return true;
+}
+
+Ref<ArrayMesh> GDDraco::decode_draco_primitive(const PackedByteArray &compressed_data) {
+    UtilityFunctions::print("GDDraco::decode_draco_primitive called!");
+
+    Decoder* decoder = decoderCreate();
+    if (!decoderDecode(decoder, (void*)compressed_data.ptr(), compressed_data.size())) {
+        UtilityFunctions::printerr("Failed to decode Draco primitive");
+        decoderRelease(decoder);
+        return Ref<ArrayMesh>();
+    }
+
+    uint32_t vertex_count = decoderGetVertexCount(decoder);
+    uint32_t index_count = decoderGetIndexCount(decoder);
+
+    Array arrays;
+    arrays.resize(Mesh::ARRAY_MAX);
+
+    // Position
+    {
+        int position_attr_id = 0;
+        if (position_attr_id < 0) {
+            UtilityFunctions::printerr("No POSITION attribute found");
+            decoderRelease(decoder);
+            return Ref<ArrayMesh>();
+        }
+
+        size_t pos_bytes = decoderGetAttributeByteLength(decoder, position_attr_id);
+        float* pos_data = (float*)malloc(pos_bytes);
+
+        decoderReadAttribute(decoder, position_attr_id, 5126, "VEC3");
+        decoderCopyAttribute(decoder, position_attr_id, pos_data);
+
+        PackedVector3Array positions;
+        positions.resize(vertex_count);
+        for (uint32_t i = 0; i < vertex_count; ++i) {
+            positions[i] = Vector3(pos_data[i * 3], pos_data[i * 3 + 1], pos_data[i * 3 + 2]);
+        }
+
+        arrays[Mesh::ARRAY_VERTEX] = positions;
+        std::free(pos_data);
+    }
+
+    // Normals (optional)
+    {
+        int normal_attr_id = 1;
+        if (normal_attr_id >= 0) {
+            size_t bytes = decoderGetAttributeByteLength(decoder, normal_attr_id);
+            float* data = (float*)malloc(bytes);
+            decoderReadAttribute(decoder, normal_attr_id, 5126, "VEC3");
+            decoderCopyAttribute(decoder, normal_attr_id, data);
+
+            PackedVector3Array normals;
+            normals.resize(vertex_count);
+            for (uint32_t i = 0; i < vertex_count; ++i) {
+                normals[i] = Vector3(data[i * 3], data[i * 3 + 1], data[i * 3 + 2]);
+            }
+            arrays[Mesh::ARRAY_NORMAL] = normals;
+            std::free(data);
+        }
+    }
+
+    // UVs (optional)
+    {
+        int uv_attr_id = 2;
+        if (uv_attr_id >= 0) {
+            size_t bytes = decoderGetAttributeByteLength(decoder, uv_attr_id);
+            float* data = (float*)malloc(bytes);
+            decoderReadAttribute(decoder, uv_attr_id, 5126, "VEC2");
+            decoderCopyAttribute(decoder, uv_attr_id, data);
+
+            PackedVector2Array uvs;
+            uvs.resize(vertex_count);
+            for (uint32_t i = 0; i < vertex_count; ++i) {
+                uvs[i] = Vector2(data[i * 2], data[i * 2 + 1]);
+            }
+            arrays[Mesh::ARRAY_TEX_UV] = uvs;
+            std::free(data);
+        }
+    }
+
+    // Indices
+    {
+        size_t indices_bytes = decoderGetIndicesByteLength(decoder);
+        uint32_t* idx_data = (uint32_t*)malloc(indices_bytes);
+
+        decoderReadIndices(decoder, 5125); // Unsigned int
+        decoderCopyIndices(decoder, idx_data);
+
+        PackedInt32Array indices;
+        indices.resize(index_count);
+        for (uint32_t i = 0; i < index_count; ++i) {
+            indices[i] = idx_data[i];
+        }
+
+        arrays[Mesh::ARRAY_INDEX] = indices;
+        std::free(idx_data);
+    }
+
+    Ref<ArrayMesh> mesh;
+    mesh.instantiate();
+    mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
+
+    decoderRelease(decoder);
+    return mesh;
 }
