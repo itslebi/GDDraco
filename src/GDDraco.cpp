@@ -46,15 +46,22 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
 
     //For each of the meshes decode each of their primitives
     for (int i = 0; i < (int)arr_meshes.size(); i++) {
+        Dictionary dic_mesh = arr_meshes[i];
+
         //Create a vector to have all of the primitives per Mesh
         std::vector<PrimitiveData> vec_primitives;
 
         //Get the data on mesh primitives
-        Dictionary dic_mesh = arr_meshes[i];
         if (!dic_mesh.has("primitives")) {
             continue;
         }
         Array arr_primitives = dic_mesh["primitives"];
+
+        //Get Mesh Name
+        String mesh_name = "Mesh" + i;
+        if (dic_mesh.has("primitives")) {
+            mesh_name = dic_mesh["name"];
+        }
 
         //Go through each primitive
         for (int i = 0; i < (int)arr_primitives.size(); i++) {
@@ -107,10 +114,17 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
 
                 Ref<Material> mat = meshes_materials[prim.material_Idx];
                 importer_mesh->set_surface_material(t, mat);
+
+                importer_mesh->set_surface_name(t, mesh_name+t);
             }
 
             UtilityFunctions::print("Created ImpoterMesh!");
             Ref<GLTFMesh> mesh_to_change = meshes_mesh[i];
+            mesh_to_change->set_original_name(mesh_name);
+            for (int b = 0; b < importer_mesh->get_blend_shape_count(); ++b) {
+                UtilityFunctions::print(importer_mesh->get_blend_shape_name(b));
+            }
+
             mesh_to_change->set_mesh(importer_mesh);
             UtilityFunctions::print("Mesh is set?");
         }
@@ -128,6 +142,18 @@ Ref<ImporterMesh> GDDraco::add_primitive_to_importer_mesh(const Ref<ArrayMesh> &
     // Get number of blend shapes and surfaces (Same for all ArrayMeshes)
     int blend_shape_count = source_mesh->get_blend_shape_count();
 	const int surface_count = source_mesh->get_surface_count();
+
+
+    // Register blend shape names (once per primitive)
+    if (blend_shape_count > 0 && importer_mesh->get_blend_shape_count() == 0) {
+        for (int b = 0; b < blend_shape_count; ++b) {
+            String name = source_mesh->get_blend_shape_name(b);
+            importer_mesh->add_blend_shape(name);
+        }
+
+        // Optional: set blend shape mode (default is normalized)
+        importer_mesh->set_blend_shape_mode(Mesh::BLEND_SHAPE_MODE_NORMALIZED);
+    }
 
 	for (int i = 0; i < surface_count; ++i) {
 		// 1. Get surface data
@@ -231,23 +257,28 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
     }
 
     // Decode JOINTS_0 (optional)
-    //Get JOINTS to temporary memory
+    // Get number of joint elements: vertex_count * 4 joints per vertex
     const int64_t joint_element_count = static_cast<int64_t>(vertex_count) * 4;
 
+    // Allocate temporary raw data buffer for joints (uint16_t, 2 bytes each)
     PackedByteArray raw_joint_data;
     raw_joint_data.resize(joint_element_count * 2); // 2 bytes per uint16_t
 
+    // Decode JOINTS_0 attribute from Draco mesh, expecting GLTF format (5123 = unsigned short)
     if (!decoderReadAttribute(decoder, joints_id, 5123, "VEC4")) {
         decoderRelease(decoder);
         ERR_FAIL_COND_V_MSG(true, nullptr, "Failed to decode JOINTS_0 attribute");
     }
     decoderCopyAttribute(decoder, joints_id, raw_joint_data.ptrw());
 
-    //Place joints on correct memory
+    // Resize destination array in Godot (expects int32 per joint)
     joints.resize(joint_element_count);
+
+    // Pointers to source (uint16_t) and destination (int32_t) arrays
     const uint16_t *src_joint = reinterpret_cast<const uint16_t *>(raw_joint_data.ptr());
     int32_t *dst = joints.ptrw();
 
+    // Convert each uint16_t joint index to int32_t explicitly
     for (int64_t i = 0; i < joint_element_count; i++) {
         dst[i] = static_cast<int32_t>(src_joint[i]);
     }
@@ -291,9 +322,9 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
         arrays[Mesh::ARRAY_NORMAL] = normals;
     if (uvs.size() == vertex_count)
         arrays[Mesh::ARRAY_TEX_UV] = uvs;
-    if (joints.size() == vertex_count)
+    if (joints.size() == vertex_count * 4)
         arrays[Mesh::ARRAY_BONES] = joints;
-    if (weights.size() == vertex_count)
+    if (weights.size() == vertex_count * 4)
         arrays[Mesh::ARRAY_WEIGHTS] = weights;
     arrays[Mesh::ARRAY_INDEX] = indices;
 
