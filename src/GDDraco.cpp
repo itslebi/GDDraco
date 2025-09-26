@@ -76,14 +76,6 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
             UtilityFunctions::print("Mesh is set?");
         }
     }
-    
-
-    /*
-    Acessors are required for the decoding: After decoding??????
-    Array[GLTFAccessor] get_accessors() 
-
-    https://github.com/blender/blender/blob/97297bd167aed7e05542fbbc85959365539f1e8b/scripts/addons_core/io_scene_gltf2/io/imp/gltf2_io_binary.py
-    */
 
     return OK;
 }
@@ -105,6 +97,8 @@ Ref<ImporterMesh> GDDraco::create_importer_mesh_from_array_mesh(const Ref<ArrayM
 	Ref<ImporterMesh> importer_mesh;
 	importer_mesh.instantiate();
 
+    // Get number of blend shapes and surfaces (Same for all ArrayMeshes)
+    int blend_shape_count = source_mesh->get_blend_shape_count();
 	const int surface_count = source_mesh->get_surface_count();
 
 	for (int i = 0; i < surface_count; ++i) {
@@ -119,8 +113,11 @@ Ref<ImporterMesh> GDDraco::create_importer_mesh_from_array_mesh(const Ref<ArrayM
 			name = source_mesh->surface_get_name(i);
 		}
 
-		// 3. Optional: Get blend shapes if present
-		TypedArray<Array> blend_shapes; // TODO: extract blend shapes if needed
+		// 3. Extract blend shapes for this surface
+        TypedArray<Array> blend_shapes;
+        if (blend_shape_count > 0) {
+            blend_shapes = source_mesh->surface_get_blend_shape_arrays(i);
+        }
 
 		// 4. Add to ImporterMesh
 		importer_mesh->add_surface(
