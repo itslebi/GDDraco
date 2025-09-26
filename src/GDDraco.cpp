@@ -79,16 +79,19 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
                 continue;
             }
             Dictionary dic_KHR_draco_mesh_compression = dic_extensions["KHR_draco_mesh_compression"];
+            if (!dic_KHR_draco_mesh_compression.has("bufferView")) {
+                UtilityFunctions::printerr("Skipping primitive " + String::num_int64(r) + " due to no bufferView key");
+                continue;
+            }
             int bufferViewIdx = dic_KHR_draco_mesh_compression["bufferView"];
 
             Ref<GLTFBufferView> buffer_view = buffer_views[bufferViewIdx];
-            int byte_offset = buffer_view->get_byte_offset();
             int byte_length = buffer_view->get_byte_length();
 
             //Verify if buffer is valid
             PackedByteArray buffer = buffer_view->load_buffer_view_data(p_state);
-            if (byte_offset < 0 || byte_offset + byte_length > buffer.size()) {
-                UtilityFunctions::printerr("bufferView range invalid");
+            if (buffer.size() != byte_length) {
+                UtilityFunctions::printerr("bufferView length mismatch (expected: ", byte_length, ", actual: ", buffer.size(), ")");
                 return ERR_INVALID_DATA;
             }
 
