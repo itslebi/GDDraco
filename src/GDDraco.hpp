@@ -12,8 +12,10 @@
 #include <src/decoder.h>
 
 #include <cstdint>
+#include <cstdlib>
 
 #include <vector>
+#include "PrimitiveData.hpp"
 
 namespace godot {
     class GDDraco: public GLTFDocumentExtension {
