@@ -12,7 +12,6 @@
 #include <src/decoder.h>
 
 #include <cstdint>
-#include <cstring>
 
 namespace godot {
     class GDDraco: public GLTFDocumentExtension {
@@ -21,10 +20,17 @@ namespace godot {
         protected:
             static void _bind_methods();
 
+            //Custom method to connect with Draco Decoder from the Draco Wrapper
+            Ref<ArrayMesh> decode_draco_mesh(const PackedByteArray &compressed_buffer, int position_id, int normal_id, int uv_id, int joints_id, int weights_id, int indices_id);
+
+            //Method that grabs the decoded mesh and transforms it into 
+            Ref<ImporterMesh> create_importer_mesh_from_array_mesh(const Ref<ArrayMesh> &source_mesh);
+
         public:
             GDDraco();
             ~GDDraco();
 
+            //This is where our decoding logic happens
             Error _import_post_parse(const Ref<GLTFState> &p_state) override;
 
             //Used to determine if my extension should be used by GLTF Importer or not
@@ -32,12 +38,6 @@ namespace godot {
 
             //Tell Godot that KHR_draco_mesh_compression is supported
             PackedStringArray _get_supported_extensions();
-
-            //Custom method to connect with Draco Decoder from the Draco Wrapper
-            Ref<ArrayMesh> decode_draco_mesh(const PackedByteArray &compressed_buffer, int position_id, int normal_id, int uv_id, int joints_id, int weights_id, int indices_id);
-
-            //Method that grabs the decoded mesh and transforms it into 
-            Ref<ImporterMesh> create_importer_mesh_from_array_mesh(const Ref<ArrayMesh> &source_mesh);
     };
 }
 
