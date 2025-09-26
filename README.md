@@ -63,6 +63,7 @@ You can import your `.glb` and `.gltf` now.
 - [Python](https://www.python.org/)
 - [SCons](https://scons.org/) (used for building)  
 _⚠️ [Godot CPP](https://github.com/godotengine/godot-cpp) is used by this project and is provided in the source code already._
+_⚠️ [VS Code](https://code.visualstudio.com/) is recommended and the base import path settings are provided._
 
 ### 1. Clone the Repository
 
@@ -108,8 +109,8 @@ Make sure to verify compatibility based on how you distribute or bundle binaries
 
 ## Credits
 **This extension was made by me alone but it would not be possible without the below open source projects!**
-* [Godot Engine](https://godotengine.org/)
-* [Google Draco](https://github.com/google/draco)
+* [Godot Engine](https://godotengine.org/) - the engine it is built for
+* [Google Draco](https://github.com/google/draco) - for the Draco SDK
 * [Blender Foundation](https://www.blender.org/) — for the Draco wrapper code
 * [Khronos Group](https://www.khronos.org/) — for the glTF format and specifications
 
