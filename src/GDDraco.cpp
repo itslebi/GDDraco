@@ -1,7 +1,5 @@
 #include "GDDraco.hpp"
 
-#include <cstdlib>
-
 using namespace godot;
 
 void GDDraco::_bind_methods() {} //only required to allow methods to be called from GDScript
@@ -49,7 +47,7 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
     //For each of the meshes decode each of their primitives
     for (int i = 0; i < (int)arr_meshes.size(); i++) {
         //Create a vector to have all of the primitives per Mesh
-        std::vector<Ref<ArrayMesh>> vec_primitives;
+        std::vector<PrimitiveData> vec_primitives;
 
         //Get the data on mesh primitives
         Dictionary dic_mesh = arr_meshes[i];
@@ -84,14 +82,19 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
             int joints_id = dic_attributes["JOINTS_0"];
             int weights_id = dic_attributes["WEIGHTS_0"];
             int indices_id = dic_primitive["indices"];
+            int material_Idx = dic_primitive["material"];
 
             Ref<ArrayMesh> primitive = decode_draco_mesh(buffer, position_id, normal_id, uv_id, joints_id, weights_id, indices_id);
             UtilityFunctions::print("Primitive Decoded!");
 
-            vec_primitives.push_back(primitive);
+            PrimitiveData primitive_data = PrimitiveData(material_Idx, primitive);
+
+            vec_primitives.push_back(primitive_data);
         }
 
+        //Assign the mesh data so that it appears in godot
         TypedArray<Ref<GLTFMesh>> meshes_mesh = p_state->get_meshes();
+        TypedArray<Ref<Material>> meshes_materials = p_state->get_materials();
         if (i >= 0 && i < meshes_mesh.size()) {
             //Create Importer Mesh
             Ref<ImporterMesh> importer_mesh;
@@ -99,7 +102,11 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
 
             //Add all primitives to this ImporterMesh
             for (int t = 0; t < (int)vec_primitives.size(); t++) {
-                importer_mesh = add_primitive_to_importer_mesh(vec_primitives[t], importer_mesh);
+                PrimitiveData prim = vec_primitives[t];
+                importer_mesh = add_primitive_to_importer_mesh(prim.primitive, importer_mesh);
+
+                Ref<Material> mat = meshes_materials[prim.material_Idx];
+                importer_mesh->set_surface_material(t, mat);
             }
 
             UtilityFunctions::print("Created ImpoterMesh!");
@@ -112,6 +119,7 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
     return OK;
 }
 
+//Adds the passed primitive to the importer_mesh passsed
 Ref<ImporterMesh> GDDraco::add_primitive_to_importer_mesh(const Ref<ArrayMesh> &source_mesh, Ref<ImporterMesh> importer_mesh) {
 	if (source_mesh.is_null()) {
 		return importer_mesh;
@@ -157,28 +165,27 @@ Ref<ImporterMesh> GDDraco::add_primitive_to_importer_mesh(const Ref<ArrayMesh> &
 
 
 Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buffer, int position_id, int normal_id, int uv_id, int joints_id, int weights_id, int indices_id) {
-    UtilityFunctions::print("GDDraco::decode_draco_mesh");
-    Decoder *decoder = decoderCreate();
+    //UtilityFunctions::print("GDDraco::decode_draco_mesh");
 
+    //Set Up decoder
+    Decoder *decoder = decoderCreate();
     if (!decoder) {
         ERR_FAIL_COND_V_MSG(true, nullptr, "Failed to create Draco decoder");
     }
 
-    UtilityFunctions::print("Compressed buffer size: " + itos(compressed_buffer.size()));
+    //Decode compressed buffer
     if (compressed_buffer.size() < 32) {
         decoderRelease(decoder);
         ERR_FAIL_V_MSG(nullptr, "Compressed buffer too small");
     }
-
     if (!decoderDecode(decoder, (void *)compressed_buffer.ptr(), compressed_buffer.size())) {
         decoderRelease(decoder);
         ERR_FAIL_COND_V_MSG(true, nullptr, "Failed to decode Draco buffer");
     }
 
+    //Get vertex and index count
     uint32_t vertex_count = decoderGetVertexCount(decoder);
     uint32_t index_count = decoderGetIndexCount(decoder);
-
-
     if (vertex_count == 0 || index_count == 0) {
         decoderRelease(decoder);
         ERR_FAIL_COND_V_MSG(true, nullptr, "Decoded mesh has zero vertices or indices");
