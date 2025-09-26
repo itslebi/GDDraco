@@ -105,5 +105,3 @@ Make sure to verify compatibility based on how you distribute or bundle binaries
 ---
 
 > © 2025 [@itslebi](https://github.com/itslebi) — Contributions welcome!
-
-```
