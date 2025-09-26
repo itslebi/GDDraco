@@ -13,6 +13,8 @@
 
 #include <cstdint>
 
+#include <vector>
+
 namespace godot {
     class GDDraco: public GLTFDocumentExtension {
         GDCLASS(GDDraco,GLTFDocumentExtension);
@@ -23,8 +25,8 @@ namespace godot {
             //Custom method to connect with Draco Decoder from the Draco Wrapper
             Ref<ArrayMesh> decode_draco_mesh(const PackedByteArray &compressed_buffer, int position_id, int normal_id, int uv_id, int joints_id, int weights_id, int indices_id);
 
-            //Method that grabs the decoded mesh and transforms it into 
-            Ref<ImporterMesh> create_importer_mesh_from_array_mesh(const Ref<ArrayMesh> &source_mesh);
+            //Method that grabs the decoded mesh and adds it to an ImporterMesh
+            Ref<ImporterMesh> add_primitive_to_importer_mesh(const Ref<ArrayMesh> &source_mesh, Ref<ImporterMesh> importer_mesh);
 
         public:
             GDDraco();

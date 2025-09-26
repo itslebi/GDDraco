@@ -32,51 +32,79 @@ Error GDDraco::_import_preflight(const Ref<GLTFState> &p_state, const PackedStri
     return ERR_SKIP; // Skip processing if Draco is not used
 }
 
+//Our Importing Logic
 Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
-    UtilityFunctions::print("GDDraco::_import_post_parse called!");
+    //UtilityFunctions::print("GDDraco::_import_post_parse called!");
 
     // Get buffer views from GLTFState
     TypedArray<Ref<GLTFBufferView>> buffer_views = p_state->get_buffer_views();
 
     //Get the JSON
     Dictionary json = p_state->get_json();
-    Array meshes = json["meshes"];
-    for (int i = 0; i < (int)meshes.size(); i++) {
-        Dictionary mesh = meshes[i];
-        Array primitives = mesh["primitives"];
-        Dictionary primitive = primitives[0];
-        Dictionary extensions = primitive["extensions"];
-        Dictionary KHR_draco_mesh_compression = extensions["KHR_draco_mesh_compression"];
-        int bufferViewIdx = KHR_draco_mesh_compression["bufferView"];
+    if (!json.has("meshes")) {
+       return ERR_INVALID_PARAMETER; 
+    }
+    Array arr_meshes = json["meshes"];
 
-        Ref<GLTFBufferView> buffer_view = buffer_views[bufferViewIdx];
-        int byte_offset = buffer_view->get_byte_offset();
-        int byte_length = buffer_view->get_byte_length();
+    //For each of the meshes decode each of their primitives
+    for (int i = 0; i < (int)arr_meshes.size(); i++) {
+        //Create a vector to have all of the primitives per Mesh
+        std::vector<Ref<ArrayMesh>> vec_primitives;
 
-        //Verify if buffer is valid
-        PackedByteArray buffer = buffer_view->load_buffer_view_data(p_state);
-        if (byte_offset < 0 || byte_offset + byte_length > buffer.size()) {
-            UtilityFunctions::printerr("bufferView range invalid");
-            return ERR_INVALID_PARAMETER;
+        //Get the data on mesh primitives
+        Dictionary dic_mesh = arr_meshes[i];
+        if (!dic_mesh.has("primitives")) {
+            continue;
         }
+        Array arr_primitives = dic_mesh["primitives"];
 
-        Dictionary attributes = KHR_draco_mesh_compression["attributes"];
-        int position_id = attributes["POSITION"];
-        int normal_id = attributes["NORMAL"];
-        int uv_id = attributes["TEXCOORD_0"];
-        int joints_id = attributes["JOINTS_0"];
-        int weights_id = attributes["WEIGHTS_0"];
-        int indices_id = primitive["indices"];
+        //Go through each primitive
+        for (int i = 0; i < (int)arr_primitives.size(); i++) {
+            Dictionary dic_primitive = arr_primitives[i];
 
-        Ref<ArrayMesh> my_mesh = decode_draco_mesh(buffer, position_id, normal_id, uv_id, joints_id, weights_id, indices_id);
-        UtilityFunctions::print("Mesh Decoded?");
+            Dictionary dic_extensions = dic_primitive["extensions"];
+            Dictionary dic_KHR_draco_mesh_compression = dic_extensions["KHR_draco_mesh_compression"];
+            int bufferViewIdx = dic_KHR_draco_mesh_compression["bufferView"];
+
+            Ref<GLTFBufferView> buffer_view = buffer_views[bufferViewIdx];
+            int byte_offset = buffer_view->get_byte_offset();
+            int byte_length = buffer_view->get_byte_length();
+
+            //Verify if buffer is valid
+            PackedByteArray buffer = buffer_view->load_buffer_view_data(p_state);
+            if (byte_offset < 0 || byte_offset + byte_length > buffer.size()) {
+                UtilityFunctions::printerr("bufferView range invalid");
+                return ERR_INVALID_PARAMETER;
+            }
+
+            Dictionary dic_attributes = dic_KHR_draco_mesh_compression["attributes"];
+            int position_id = dic_attributes["POSITION"];
+            int normal_id = dic_attributes["NORMAL"];
+            int uv_id = dic_attributes["TEXCOORD_0"];
+            int joints_id = dic_attributes["JOINTS_0"];
+            int weights_id = dic_attributes["WEIGHTS_0"];
+            int indices_id = dic_primitive["indices"];
+
+            Ref<ArrayMesh> primitive = decode_draco_mesh(buffer, position_id, normal_id, uv_id, joints_id, weights_id, indices_id);
+            UtilityFunctions::print("Primitive Decoded!");
+
+            vec_primitives.push_back(primitive);
+        }
 
         TypedArray<Ref<GLTFMesh>> meshes_mesh = p_state->get_meshes();
         if (i >= 0 && i < meshes_mesh.size()) {
-            Ref<ImporterMesh> importerMesh = create_importer_mesh_from_array_mesh(my_mesh);
-            UtilityFunctions::print("Created ImpoterMesh?");
+            //Create Importer Mesh
+            Ref<ImporterMesh> importer_mesh;
+            importer_mesh.instantiate();
+
+            //Add all primitives to this ImporterMesh
+            for (int t = 0; t < (int)vec_primitives.size(); t++) {
+                importer_mesh = add_primitive_to_importer_mesh(vec_primitives[t], importer_mesh);
+            }
+
+            UtilityFunctions::print("Created ImpoterMesh!");
             Ref<GLTFMesh> mesh_to_change = meshes_mesh[i];
-            mesh_to_change->set_mesh(importerMesh);
+            mesh_to_change->set_mesh(importer_mesh);
             UtilityFunctions::print("Mesh is set?");
         }
     }
@@ -84,13 +112,10 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
     return OK;
 }
 
-Ref<ImporterMesh> GDDraco::create_importer_mesh_from_array_mesh(const Ref<ArrayMesh> &source_mesh) {
+Ref<ImporterMesh> GDDraco::add_primitive_to_importer_mesh(const Ref<ArrayMesh> &source_mesh, Ref<ImporterMesh> importer_mesh) {
 	if (source_mesh.is_null()) {
-		return Ref<ImporterMesh>();
+		return importer_mesh;
 	}
-
-	Ref<ImporterMesh> importer_mesh;
-	importer_mesh.instantiate();
 
     // Get number of blend shapes and surfaces (Same for all ArrayMeshes)
     int blend_shape_count = source_mesh->get_blend_shape_count();
