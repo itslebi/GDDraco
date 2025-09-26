@@ -1,20 +1,13 @@
 #ifndef GD_DRACO_HPP
 #define GD_DRACO_HPP
 
-#include <godot_cpp/classes/gltf_node.hpp>
 #include <godot_cpp/classes/gltf_state.hpp>
 #include <godot_cpp/classes/gltf_document_extension.hpp>
-#include <godot_cpp/classes/gltf_object_model_property.hpp>
 #include <godot_cpp/classes/gltf_mesh.hpp>
 #include <godot_cpp/classes/mesh.hpp>
 #include <godot_cpp/classes/importer_mesh.hpp>
 #include <godot_cpp/classes/array_mesh.hpp>
 #include <godot_cpp/classes/gltf_buffer_view.hpp>
-#include <godot_cpp/variant/variant.hpp>
-
-#include <godot_cpp/classes/node3d.hpp>
-#include <godot_cpp/classes/gltf_texture.hpp>
-#include <godot_cpp/classes/image.hpp>
 
 #include <src/decoder.h>
 
@@ -41,12 +34,9 @@ namespace godot {
             PackedStringArray _get_supported_extensions();
 
             //Custom method to connect with Draco Decoder from the Draco Wrapper
-            Ref<Mesh> decode_draco_mesh(const PackedByteArray &compressed_data);
-
-            Ref<ArrayMesh> decode_draco_primitive(const PackedByteArray &compressed_data);
-
             Ref<ArrayMesh> decode_draco_mesh(const PackedByteArray &compressed_buffer, int position_id, int normal_id, int uv_id, int joints_id, int weights_id, int indices_id);
 
+            //Method that grabs the decoded mesh and transforms it into 
             Ref<ImporterMesh> create_importer_mesh_from_array_mesh(const Ref<ArrayMesh> &source_mesh);
     };
 }

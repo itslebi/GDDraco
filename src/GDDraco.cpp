@@ -4,19 +4,23 @@
 
 using namespace godot;
 
-void GDDraco::_bind_methods() {
-    // No binding needed unless exposing to GDScript.
+void GDDraco::_bind_methods() {} //only required to allow methods to be called from GDScript
+
+//Default Constructor and destructor
+GDDraco::GDDraco() {}
+GDDraco::~GDDraco() {}
+
+//Tell Godot that GDDraco supports KHR_draco_mesh_compression
+PackedStringArray GDDraco::_get_supported_extensions() {
+    //UtilityFunctions::print("GDDraco::_get_supported_extensions called!");
+    PackedStringArray extensions;
+    extensions.append("KHR_draco_mesh_compression");
+    return extensions;
 }
 
-GDDraco::GDDraco() {
-    UtilityFunctions::print("GDDraco constructor called");
-}
-GDDraco::~GDDraco() {
-    UtilityFunctions::print("GDDraco destructor called");
-}
-
+//Tell Godot if it should use GDDraco or not
 Error GDDraco::_import_preflight(const Ref<GLTFState> &p_state, const PackedStringArray &p_extensions) {
-    UtilityFunctions::print("GDDraco::_import_preflight called!");
+    //UtilityFunctions::print("GDDraco::_import_preflight called!");
 
     for (int i = 0; i < p_extensions.size(); ++i) {
         String ext = p_extensions[i];
@@ -78,15 +82,6 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
     }
 
     return OK;
-}
-
-PackedStringArray GDDraco::_get_supported_extensions() {
-    UtilityFunctions::print("GDDraco::_get_supported_extensions called!");
-
-    PackedStringArray extensions;
-    extensions.append("KHR_draco_mesh_compression");
-    UtilityFunctions::print(extensions);
-    return extensions;
 }
 
 Ref<ImporterMesh> GDDraco::create_importer_mesh_from_array_mesh(const Ref<ArrayMesh> &source_mesh) {
@@ -225,8 +220,6 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
         dst[i] = static_cast<int32_t>(src_joint[i]);
     }
 
-
-
     // Decode WEIGHTS_0 (optional)
     if (weights_id >= 0 && decoderReadAttribute(decoder, weights_id, 5126, "VEC4")) {
         decoderCopyAttribute(decoder, weights_id, weights.ptrw());
@@ -274,204 +267,5 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
 
     mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
 
-    return mesh;
-}
-
-
-//_________________________________________________________________________
-
-
-Ref<Mesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_data) {
-    UtilityFunctions::print("GDDraco::decode_draco_mesh called!");
-
-    // Use ComponentType enum values
-    const size_t component_type_float = 5126;       // Float
-    const size_t component_type_uint = 5125;        // UnsignedInt
-
-    Decoder* decoder = decoderCreate();
-    if (!decoderDecode(decoder, (void*)compressed_data.ptr(), compressed_data.size())) {
-        UtilityFunctions::printerr("Failed to decode Draco mesh");
-        decoderRelease(decoder);
-        return Ref<Mesh>();
-    }
-
-    uint32_t vertex_count = decoderGetVertexCount(decoder);
-    uint32_t index_count = decoderGetIndexCount(decoder);
-
-    // Assume POSITION attribute id = 0
-    uint32_t position_attribute_id = 0;
-
-    size_t position_byte_length = decoderGetAttributeByteLength(decoder, position_attribute_id);
-    if (position_byte_length == 0) {
-        UtilityFunctions::printerr("Position attribute byte length is zero");
-        decoderRelease(decoder);
-        return Ref<Mesh>();
-    }
-
-    float* position_data = (float*)malloc(position_byte_length);
-
-    if (!decoderReadAttribute(decoder, position_attribute_id, component_type_float, const_cast<char*>("FLOAT"))) {
-        UtilityFunctions::printerr("Failed to read position attribute");
-        std::free(position_data);
-        decoderRelease(decoder);
-        return Ref<Mesh>();
-    }
-
-    decoderCopyAttribute(decoder, position_attribute_id, position_data);
-
-    PackedVector3Array vertices;
-    vertices.resize(vertex_count);
-
-    for (uint32_t i = 0; i < vertex_count; ++i) {
-        vertices[i] = Vector3(position_data[i*3], position_data[i*3 + 1], position_data[i*3 + 2]);
-    }
-
-    std::free(position_data);
-
-    // Indices
-
-    size_t indices_byte_length = decoderGetIndicesByteLength(decoder);
-    if (indices_byte_length == 0) {
-        UtilityFunctions::printerr("Indices byte length is zero");
-        decoderRelease(decoder);
-        return Ref<Mesh>();
-    }
-
-    uint32_t* index_data = (uint32_t*)malloc(indices_byte_length);
-
-    if (!decoderReadIndices(decoder, component_type_uint)) {
-        UtilityFunctions::printerr("Failed to read indices");
-        std::free(index_data);
-        decoderRelease(decoder);
-        return Ref<Mesh>();
-    }
-
-    decoderCopyIndices(decoder, index_data);
-
-    PackedInt32Array indices;
-    indices.resize(index_count);
-    for (uint32_t i = 0; i < index_count; ++i) {
-        indices[i] = index_data[i];
-    }
-
-    std::free(index_data);
-
-    // Create Godot mesh
-    Ref<ArrayMesh> mesh;
-    mesh.instantiate();
-
-    Array arrays;
-    arrays.resize(Mesh::ARRAY_MAX);
-    arrays[Mesh::ARRAY_VERTEX] = vertices;
-    arrays[Mesh::ARRAY_INDEX] = indices;
-
-    mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
-
-    decoderRelease(decoder);
-    return mesh;
-}
-
-Ref<ArrayMesh> GDDraco::decode_draco_primitive(const PackedByteArray &compressed_data) {
-    UtilityFunctions::print("GDDraco::decode_draco_primitive called!");
-
-    Decoder* decoder = decoderCreate();
-    if (!decoderDecode(decoder, (void*)compressed_data.ptr(), compressed_data.size())) {
-        UtilityFunctions::printerr("Failed to decode Draco primitive");
-        decoderRelease(decoder);
-        return Ref<ArrayMesh>();
-    }
-
-    uint32_t vertex_count = decoderGetVertexCount(decoder);
-    uint32_t index_count = decoderGetIndexCount(decoder);
-
-    Array arrays;
-    arrays.resize(Mesh::ARRAY_MAX);
-
-    // Position
-    {
-        int position_attr_id = 0;
-        if (position_attr_id < 0) {
-            UtilityFunctions::printerr("No POSITION attribute found");
-            decoderRelease(decoder);
-            return Ref<ArrayMesh>();
-        }
-
-        size_t pos_bytes = decoderGetAttributeByteLength(decoder, position_attr_id);
-        float* pos_data = (float*)malloc(pos_bytes);
-
-        decoderReadAttribute(decoder, position_attr_id, 5126, "VEC3");
-        decoderCopyAttribute(decoder, position_attr_id, pos_data);
-
-        PackedVector3Array positions;
-        positions.resize(vertex_count);
-        for (uint32_t i = 0; i < vertex_count; ++i) {
-            positions[i] = Vector3(pos_data[i * 3], pos_data[i * 3 + 1], pos_data[i * 3 + 2]);
-        }
-
-        arrays[Mesh::ARRAY_VERTEX] = positions;
-        std::free(pos_data);
-    }
-
-    // Normals (optional)
-    {
-        int normal_attr_id = 1;
-        if (normal_attr_id >= 0) {
-            size_t bytes = decoderGetAttributeByteLength(decoder, normal_attr_id);
-            float* data = (float*)malloc(bytes);
-            decoderReadAttribute(decoder, normal_attr_id, 5126, "VEC3");
-            decoderCopyAttribute(decoder, normal_attr_id, data);
-
-            PackedVector3Array normals;
-            normals.resize(vertex_count);
-            for (uint32_t i = 0; i < vertex_count; ++i) {
-                normals[i] = Vector3(data[i * 3], data[i * 3 + 1], data[i * 3 + 2]);
-            }
-            arrays[Mesh::ARRAY_NORMAL] = normals;
-            std::free(data);
-        }
-    }
-
-    // UVs (optional)
-    {
-        int uv_attr_id = 2;
-        if (uv_attr_id >= 0) {
-            size_t bytes = decoderGetAttributeByteLength(decoder, uv_attr_id);
-            float* data = (float*)malloc(bytes);
-            decoderReadAttribute(decoder, uv_attr_id, 5126, "VEC2");
-            decoderCopyAttribute(decoder, uv_attr_id, data);
-
-            PackedVector2Array uvs;
-            uvs.resize(vertex_count);
-            for (uint32_t i = 0; i < vertex_count; ++i) {
-                uvs[i] = Vector2(data[i * 2], data[i * 2 + 1]);
-            }
-            arrays[Mesh::ARRAY_TEX_UV] = uvs;
-            std::free(data);
-        }
-    }
-
-    // Indices
-    {
-        size_t indices_bytes = decoderGetIndicesByteLength(decoder);
-        uint32_t* idx_data = (uint32_t*)malloc(indices_bytes);
-
-        decoderReadIndices(decoder, 5125); // Unsigned int
-        decoderCopyIndices(decoder, idx_data);
-
-        PackedInt32Array indices;
-        indices.resize(index_count);
-        for (uint32_t i = 0; i < index_count; ++i) {
-            indices[i] = idx_data[i];
-        }
-
-        arrays[Mesh::ARRAY_INDEX] = indices;
-        std::free(idx_data);
-    }
-
-    Ref<ArrayMesh> mesh;
-    mesh.instantiate();
-    mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
-
-    decoderRelease(decoder);
     return mesh;
 }

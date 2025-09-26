@@ -7,8 +7,11 @@ env.Append(CPPPATH=[
     ])
 
 sources = (
+    # GDDraco Source
     Glob("src/*cpp") +
+    # Godot CPP Source
     Glob("include/src/*.cpp") +
+    # Draco SDK Source
     Glob("include/draco/src/draco/animation/*.cc") +
     Glob("include/draco/src/draco/attributes/*.cc") +
     Glob("include/draco/src/draco/mesh/*.cc") +
@@ -25,6 +28,6 @@ sources = (
     Glob("include/draco/src/draco/compression/point_cloud/algorithms/*.cc")
 )
 
-library = env.SharedLibrary("demo/bin/File{}{}".format(env["suffix"], env["SHLIBSUFFIX"]), source = sources)
+library = env.SharedLibrary("demo/bin/GDDraco{}{}".format(env["suffix"], env["SHLIBSUFFIX"]), source = sources)
 
 Default(library)
