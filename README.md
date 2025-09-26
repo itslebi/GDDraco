@@ -102,6 +102,5 @@ Make sure to verify compatibility based on how you distribute or bundle binaries
 * [Blender Foundation](https://www.blender.org/) — for the Draco wrapper code
 * [Khronos Group](https://www.khronos.org/) — for the glTF format and specifications
 
----
 
 > © 2025 [@itslebi](https://github.com/itslebi) — Contributions welcome!
