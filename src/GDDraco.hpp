@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <cstdlib>
 
+#include <set>
 #include <vector>
 #include "PrimitiveData.hpp"
 

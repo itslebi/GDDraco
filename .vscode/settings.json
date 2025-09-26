@@ -62,6 +62,14 @@
         "xlocnum": "cpp",
         "xmemory": "cpp",
         "xstddef": "cpp",
-        "xtr1common": "cpp"
+        "xtr1common": "cpp",
+        "charconv": "cpp",
+        "format": "cpp",
+        "locale": "cpp",
+        "optional": "cpp",
+        "xlocbuf": "cpp",
+        "xlocmes": "cpp",
+        "xlocmon": "cpp",
+        "xloctime": "cpp"
     }
 }
