@@ -9,11 +9,13 @@ This extension uses the Draco Decoder found in Blender's [Draco SDK Wrapper](htt
 
 ## Index
 
-- [Features](#-features)
+- [Features](#features)
 - [How to Use](#how-to-use)
   - [Prerequisites](#prerequisites)
-  - [Download the Latest Release](#1-download-the-latest-release)
-- [Developing Build](#developing-build)
+  - [1. Download the Latest Release](#1-download-the-latest-release)
+  - [2. Add it to your Project](#2-add-it-to-your-project)
+  - [3. Done](#3-done)
+- [Developer Build](#developer-build)
   - [Prerequisites](#prerequisites-1)
   - [1. Clone the Repository](#1-clone-the-repository)
   - [2. Building](#2-building)
@@ -40,11 +42,18 @@ This extension uses the Draco Decoder found in Blender's [Draco SDK Wrapper](htt
   _⚠️ This extension was tested with **Godot 4.5**. It may work with other 4.x versions, but compatibility is not guaranteed._
 
 ### 1. Download the Latest Release
-....
+You can find the latest release for Windows and Linux in [Releases](https://github.com/itslebi/GDDraco/releases).
+For MacOs users you can follow the guide on the developer build to build your own release.
+
+### 2. Add it to your project
+Unzip the file from the release and add the resulting folder on your main project directory. 
+
+### 3. Done
+You can import your `.glb` and `.gltf` now.
 
 ---
 
-## Developing Build
+## Developer Build
 
 ### Prerequisites
 
@@ -69,10 +78,10 @@ Run the following command inside the main `GDDraco` folder:
 scons
 ```
 
-> ⚙️ This will build the GDExtension and output the compiled binary (`.dll` or `.so`) in the ```bin/``` directory.
+> ⚙️ This will build the GDExtension and output the compiled binary (`.dll` or `.so`) in the ```demo/bin/``` directory.
 
 ### 3. Testing
-
+_⚠️ Remember to verify if your compiled binary is present in the `gddraco.gdextension` file._
 Use the demo project in the `demo/` folder:
 
 * Open the project with Godot
