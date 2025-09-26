@@ -75,7 +75,7 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
             Dictionary dic_extensions = dic_primitive["extensions"];
 
             if (!dic_extensions.has("KHR_draco_mesh_compression")) {
-                UtilityFunctions::printerr("Skipping mesh " + String::num_int64(r) + " due to no KHR_draco_mesh_compression key");
+                UtilityFunctions::printerr("Skipping primitive " + String::num_int64(r) + " due to no KHR_draco_mesh_compression key");
                 continue;
             }
             Dictionary dic_KHR_draco_mesh_compression = dic_extensions["KHR_draco_mesh_compression"];
@@ -89,19 +89,58 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
             PackedByteArray buffer = buffer_view->load_buffer_view_data(p_state);
             if (byte_offset < 0 || byte_offset + byte_length > buffer.size()) {
                 UtilityFunctions::printerr("bufferView range invalid");
-                return ERR_INVALID_PARAMETER;
+                return ERR_INVALID_DATA;
             }
 
+            if (!dic_KHR_draco_mesh_compression.has("attributes")) {
+                UtilityFunctions::printerr("Skipping primitive " + String::num_int64(r) + " due to no attributes key");
+                continue;
+            }
             Dictionary dic_attributes = dic_KHR_draco_mesh_compression["attributes"];
-            int position_id = dic_attributes["POSITION"];
-            int normal_id = dic_attributes["NORMAL"];
-            int uv_id = dic_attributes["TEXCOORD_0"];
-            int joints_id = dic_attributes["JOINTS_0"];
-            int weights_id = dic_attributes["WEIGHTS_0"];
-            int indices_id = dic_primitive["indices"];
-            int material_Idx = dic_primitive["material"];
 
+            //GET ATTRIBUTES DATA
+            if (!dic_attributes.has("POSITION")) {
+                UtilityFunctions::printerr("Skipping primitive " + String::num_int64(r) + " due to no POSITION key");
+                continue;
+            }
+            int position_id = dic_attributes["POSITION"];
+
+            int normal_id = -1;
+            if (dic_attributes.has("NORMAL")) {
+                normal_id = dic_attributes["NORMAL"];
+            }
+
+            int uv_id = -2;
+            if (dic_attributes.has("TEXCOORD_0")) {
+                uv_id = dic_attributes["TEXCOORD_0"];
+            }
+
+            int joints_id = -3;
+            if (dic_attributes.has("JOINTS_0")) {
+                joints_id = dic_attributes["JOINTS_0"];
+            }
+            
+            int weights_id = -4;
+            if (dic_attributes.has("WEIGHTS_0")) {
+                weights_id = dic_attributes["WEIGHTS_0"];
+            }
+
+            if (!dic_primitive.has("indices")) {
+                UtilityFunctions::printerr("Skipping primitive " + String::num_int64(r) + " due to no indices key");
+                continue;
+            }
+            int indices_id = dic_primitive["indices"];
+
+            int material_Idx = -5;
+            if (dic_primitive.has("material")) {
+                material_Idx = dic_primitive["material"];
+            }
+
+            //Decode Mesh
             Ref<ArrayMesh> primitive = decode_draco_mesh(buffer, position_id, normal_id, uv_id, joints_id, weights_id, indices_id);
+            if (primitive == nullptr) {
+                return ERR_INVALID_DATA; 
+            }
             //UtilityFunctions::print("Primitive Decoded!");
 
             PrimitiveData primitive_data = PrimitiveData(material_Idx, primitive);
@@ -290,14 +329,6 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
     // Allocate temporary raw data buffer for joints (uint16_t, 2 bytes each)
     PackedByteArray raw_joint_data;
     raw_joint_data.resize(joint_element_count * 2); // 2 bytes per uint16_t
-
-    // Decode JOINTS_0 attribute from Draco mesh, expecting GLTF format (5123 = unsigned short)
-    if (!decoderReadAttribute(decoder, joints_id, 5123, "VEC4")) {
-        decoderRelease(decoder);
-        ERR_FAIL_COND_V_MSG(true, nullptr, "Failed to decode JOINTS_0 attribute");
-        return nullptr;
-    }
-    decoderCopyAttribute(decoder, joints_id, raw_joint_data.ptrw());
 
     if (joints_id >= 0 && decoderReadAttribute(decoder, joints_id, 5123, "VEC4")) {
         decoderCopyAttribute(decoder, joints_id, raw_joint_data.ptrw());
