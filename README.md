@@ -58,10 +58,11 @@ You can import your `.glb` and `.gltf` now.
 ### Prerequisites
 
 - **[Godot 4.5](https://godotengine.org/)**  
-  _⚠️ This extension was tested with **Godot 4.5**. It may work with other 4.x versions, but compatibility is not guaranteed._
+  _⚠️ This extension was tested with **Godot 4.5**. It may work with other 4.x versions, but compatibility is not guaranteed._  
 - C++ build environment (GCC/Clang/MSVC)
 - [Python](https://www.python.org/)
-- [SCons](https://scons.org/) (used for building)
+- [SCons](https://scons.org/) (used for building)  
+_⚠️ [Godot CPP](https://github.com/godotengine/godot-cpp) is used by this project and is provided in the source code already._
 
 ### 1. Clone the Repository
 
@@ -77,6 +78,7 @@ Run the following command inside the main `GDDraco` folder:
 ```bash
 scons
 ```
+_⚠️ If [Godot CPP](https://github.com/godotengine/godot-cpp) does not build automatically please refer to their documentation and build it manually._  
 
 > ⚙️ This will build the GDExtension and output the compiled binary (`.dll` or `.so`) in the ```demo/bin/``` directory.
 
