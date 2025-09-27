@@ -7,5 +7,5 @@ reloadable = true
 [libraries]
 linux.debug.x86_64 = "res://bin/GDDraco.linux.template_debug.x86_64.so"
 windows.debug.x86_64 = "res://bin/GDDraco.windows.template_debug.x86_64.dll"
-linux.release.x86_64 = "res://bin/GDDraco.linux.template_debug.x86_64.so"
+linux.release.x86_64 = "res://bin/GDDraco.linux.template_release.x86_64.so"
 windows.release.x86_64 = "res://bin/GDDraco.windows.template_debug.x86_64.dll"
