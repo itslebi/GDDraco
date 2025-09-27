@@ -77,7 +77,7 @@ cd GDDraco
 Run the following command inside the main `GDDraco` folder:
 
 ```bash
-scons
+scons target=template_release
 ```
 _⚠️ If [Godot CPP](https://github.com/godotengine/godot-cpp) does not build automatically please refer to their documentation and build it manually._  
 
@@ -95,13 +95,13 @@ Use the demo project in the `demo/` folder:
 
 ## License
 
-**GDDraco** is open source and licensed under the **GPL**.
+**GDDraco** is open source and licensed under the **MIT License**.
 You are free to use, modify, and distribute this software as long as the original license and copyright notice are included.
 
 Please note:
 
 * [Google Draco](https://github.com/google/draco) is licensed under the **Apache 2.0 License**
-* [Blender](https://www.blender.org/) source code used for the wrapper is licensed under **GPL**
+* [Blender](https://www.blender.org/) source code used for the wrapper is licensed under **Apache 2.0 License** (note that blender's source code is actually under GPL but these files contain an header stating otherwise).
 
 Make sure to verify compatibility based on how you distribute or bundle binaries.
 

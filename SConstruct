@@ -1,3 +1,6 @@
+if not ARGUMENTS.get("target"):
+    ARGUMENTS["target"] = "template_debug"
+
 env = SConscript("godot-cpp/SConstruct")
 
 env.Append(CPPPATH=[
