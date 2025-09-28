@@ -9,6 +9,22 @@ env.Append(CPPPATH=[
     "include"
     ])
 
+# --- BEGIN PATCHED BUILD FLAGS ---
+try:
+    if ARGUMENTS["target"] == "template_release":
+        if env.get("platform") == "windows":
+            env.Append(CCFLAGS=["/O2"])
+        else:
+            env.Append(CCFLAGS=["-O3", "-fno-exceptions", "-fno-rtti", "-flto"])
+            env.Append(LINKFLAGS=["-s", "-flto"])
+    env.Append(CCFLAGS=[
+        "-DDRACO_POINT_CLOUD_COMPRESSION",
+        "-DDRACO_MESH_COMPRESSION"
+    ])
+except Exception as e:
+    print("GDDraco build flags warning:", e)
+# --- END PATCHED BUILD FLAGS ---
+
 sources = (
     # GDDraco Source
     Glob("src/*cpp") +

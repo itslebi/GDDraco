@@ -11,4 +11,6 @@ No GPL-licensed Blender code or Blender-specific patches have been used in this 
 - Draco: https://google.github.io/draco/
 - Apache License 2.0: http://www.apache.org/licenses/LICENSE-2.0
 
-
+--
+### Blender Draco Wrapper patch by GDDraco
+GDDraco implements a performance patch on file src/decoder.cpp from Blender. Patched code is properly marked on the affected file.

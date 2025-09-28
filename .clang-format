@@ -1,0 +1,7 @@
+BasedOnStyle: Google         # Use Google C++ style as a base
+IndentWidth: 4               # Use 4-space indentation
+ColumnLimit: 100             # Max line length
+DerivePointerAlignment: false
+PointerAlignment: Left       # Pointers like: `int* ptr`, not `int *ptr`
+SortIncludes: true           # Automatically sort #include lines
+IncludeBlocks: Regroup       # Group includes into logical blocks
