@@ -39,8 +39,9 @@
 #include <cstdlib>
 
 #include <set>
-#include <vector>
+
 #include "PrimitiveData.hpp"
+#include "headers/logging.hpp"
 
 namespace godot {
     class GDDraco: public GLTFDocumentExtension {

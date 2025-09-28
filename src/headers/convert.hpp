@@ -22,27 +22,26 @@
  * SOFTWARE.
  */
 
-#ifndef CONVERT_HPP
-#define CONVERT_HPP
+#ifndef GDDRACO_CONVERT_HPP
+#define GDDRACO_CONVERT_HPP
 
-#include <vector>
 #include <cstdint>
+#include "draco/mesh/mesh.h"
 
 namespace gddraco {
 
-template <class MeshT>
-inline void fill_indices_tris(const MeshT& mesh, std::vector<uint32_t>& indices) {
-    const int faces = mesh.num_faces();
-    indices.clear();
-    indices.reserve(static_cast<size_t>(faces) * 3);
-    for (int f = 0; f < faces; ++f) {
-        const auto &tri = mesh.face(draco::FaceIndex(f));
-        indices.push_back(static_cast<uint32_t>(tri[0].value()));
-        indices.push_back(static_cast<uint32_t>(tri[1].value()));
-        indices.push_back(static_cast<uint32_t>(tri[2].value()));
+    // Places the indices from tris to the correct OutputIterator
+    template <class MeshT, class OutputIt>
+    inline void fill_indices_tris(const MeshT& mesh, OutputIt out) {
+        const int faces = mesh.num_faces();
+        for (int f = 0; f < faces; ++f) {
+            const auto& tri = mesh.face(draco::FaceIndex(f));
+            *out++ = tri[0].value();
+            *out++ = tri[1].value();
+            *out++ = tri[2].value();
+        }
     }
-}
 
 }  // namespace gddraco
 
-#endif //CONVERT_HPP
+#endif //GDDRACO_CONVERT_HPP

@@ -22,31 +22,32 @@
  * SOFTWARE.
  */
 
-#ifndef LOGGING_HPP
-#define LOGGING_HPP
+#ifndef GDRACO_LOGGING_HPP
+#define GDRACO_LOGGING_HPP
 
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
 namespace gddraco {
 
-// Error log always shown
-inline void log_error(const godot::String &msg) {
-    godot::UtilityFunctions::push_error("[GDDraco] " + msg);
-}
-
-// Warning log always shown
-inline void log_warn(const godot::String &msg) {
-    godot::UtilityFunctions::print("[GDDraco][warn] " + msg);
-}
-
-// Info log shown only in editor
-inline void log_info(const godot::String &msg) {
-    if (godot::Engine::get_singleton()->is_editor_hint()) {
-        godot::UtilityFunctions::print("[GDDraco] " + msg);
+    // Error log always shown
+    inline void log_error(const godot::String &msg) {
+        //godot::UtilityFunctions::push_error("[GDDraco] " + msg);
+        ERR_FAIL_MSG("[GDDraco] " + msg);
     }
-}
+
+    // Warning log always shown
+    inline void log_warn(const godot::String &msg) {
+        godot::UtilityFunctions::push_warning("[GDDraco] " + msg);
+    }
+
+    // Info log shown only in editor
+    inline void log_info(const godot::String &msg) {
+        if (godot::Engine::get_singleton()->is_editor_hint()) {
+            godot::UtilityFunctions::print("[GDDraco] " + msg);
+        }
+    }
 
 }  // namespace gddraco
 
-#endif //LOGGING_HPP
+#endif //GDRACO_LOGGING_HPP
