@@ -173,20 +173,18 @@ void decoderCopyAttribute(Decoder *decoder, size_t id, void *output)
 // MIT License
 // Copyright (c) 2025 itslebi, 3Onion
 template <class T>
-void decodeIndices(Decoder *decoder) {
-    std::vector<uint32_t> tmp_indices;
-    gddraco::fill_indices_tris(*decoder->mesh, tmp_indices);
+void decodeIndices(Decoder* decoder) {
+    const size_t numIndices = decoder->mesh->num_faces() * 3;
+    
+    std::vector<uint8_t> decodedIndices(numIndices * sizeof(T));
+    T* typedView = reinterpret_cast<T*>(decodedIndices.data());
 
-    std::vector<uint8_t> decodedIndices;
-    decodedIndices.resize(tmp_indices.size() * sizeof(T));
-    T *typedView = reinterpret_cast<T *>(decodedIndices.data());
-
-    for (size_t i = 0; i < tmp_indices.size(); ++i) {
-        typedView[i] = static_cast<T>(tmp_indices[i]);
-    }
+    // Write directly to typedView using the helper
+    gddraco::fill_indices_tris(*decoder->mesh, typedView);
 
     decoder->indexBuffer = std::move(decodedIndices);
 }
+// End Patch
 
 /*
 * Legacy implementation of decodeIndices<T>

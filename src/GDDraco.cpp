@@ -47,6 +47,7 @@ Error GDDraco::_import_preflight(const Ref<GLTFState> &p_state, const PackedStri
     for (int i = 0; i < p_extensions.size(); ++i) {
         String ext = p_extensions[i];
         if (ext == "KHR_draco_mesh_compression") {
+            gddraco::log_info("KHR_draco_mesh_compression extension found. Using GDDraco.");
             return OK; // Proceed with Draco decoding
         }
     }
@@ -64,6 +65,7 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
     //Get the JSON
     Dictionary json = p_state->get_json();
     if (!json.has("meshes")) {
+        gddraco::log_error("JSON does not contain 'meshes' key. Invalid GLTF file.");
        return ERR_INVALID_PARAMETER; 
     }
     Array arr_meshes = json["meshes"];
@@ -77,7 +79,7 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
 
         //Get the data on mesh primitives
         if (!dic_mesh.has("primitives")) {
-            UtilityFunctions::printerr("Skipping mesh " + String::num_int64(i) + " due to no primitives key");
+            gddraco::log_warn("Skipping mesh " + String::num_int64(i) + " due to missing 'primitives' key");
             continue;
         }
         Array arr_primitives = dic_mesh["primitives"];
@@ -85,6 +87,7 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
         //Get Mesh Name
         String mesh_name = "Mesh";
         if (dic_mesh.has("primitives")) {
+            gddraco::log_warn("No name found for this primitive. Using default name `Mesh`.");
             mesh_name = dic_mesh["name"];
         }
 
@@ -93,18 +96,19 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
             Dictionary dic_primitive = arr_primitives[r];
 
             if (!dic_primitive.has("extensions")) {
-                UtilityFunctions::printerr("Skipping primitive " + String::num_int64(r) + " due to no extensions key");
+                gddraco::log_warn("Skipping primitive " + String::num_int64(r) + " due to missing 'extensions' key");
                 continue;
             }
             Dictionary dic_extensions = dic_primitive["extensions"];
 
             if (!dic_extensions.has("KHR_draco_mesh_compression")) {
-                UtilityFunctions::printerr("Skipping primitive " + String::num_int64(r) + " due to no KHR_draco_mesh_compression key");
+                gddraco::log_warn("Skipping primitive " + String::num_int64(r) + " due to missing 'KHR_draco_mesh_compression' key");
                 continue;
             }
             Dictionary dic_KHR_draco_mesh_compression = dic_extensions["KHR_draco_mesh_compression"];
+
             if (!dic_KHR_draco_mesh_compression.has("bufferView")) {
-                UtilityFunctions::printerr("Skipping primitive " + String::num_int64(r) + " due to no bufferView key");
+                gddraco::log_warn("Skipping primitive " + String::num_int64(r) + " due to missing 'bufferView' key");
                 continue;
             }
             int bufferViewIdx = dic_KHR_draco_mesh_compression["bufferView"];
@@ -115,19 +119,19 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
             //Verify if buffer is valid
             PackedByteArray buffer = buffer_view->load_buffer_view_data(p_state);
             if (buffer.size() != byte_length) {
-                UtilityFunctions::printerr("bufferView length mismatch (expected: ", byte_length, ", actual: ", buffer.size(), ")");
+                gddraco::log_error("bufferView length mismatch (expected: " + String::num_int64(byte_length) + ", actual: " + String::num_int64(buffer.size()) + ")");
                 return ERR_INVALID_DATA;
             }
 
             if (!dic_KHR_draco_mesh_compression.has("attributes")) {
-                UtilityFunctions::printerr("Skipping primitive " + String::num_int64(r) + " due to no attributes key");
+                gddraco::log_warn("Skipping primitive " + String::num_int64(r) + " due to missing 'attributes' key");
                 continue;
             }
             Dictionary dic_attributes = dic_KHR_draco_mesh_compression["attributes"];
 
             //GET ATTRIBUTES DATA
             if (!dic_attributes.has("POSITION")) {
-                UtilityFunctions::printerr("Skipping primitive " + String::num_int64(r) + " due to no POSITION key");
+                gddraco::log_warn("Skipping primitive " + String::num_int64(r) + " due to missing 'POSITION' attribute");
                 continue;
             }
             int position_id = dic_attributes["POSITION"];
@@ -135,25 +139,33 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
             int normal_id = -1;
             if (dic_attributes.has("NORMAL")) {
                 normal_id = dic_attributes["NORMAL"];
+            } else {
+                gddraco::log_info("No normal for primitive " + String::num_int64(r) + ". Proceding with default value.");
             }
 
             int uv_id = -2;
             if (dic_attributes.has("TEXCOORD_0")) {
                 uv_id = dic_attributes["TEXCOORD_0"];
+            } else {
+                gddraco::log_info("No uv for primitive " + String::num_int64(r)  + ". Proceding with default value.");
             }
 
             int joints_id = -3;
             if (dic_attributes.has("JOINTS_0")) {
                 joints_id = dic_attributes["JOINTS_0"];
+            } else {
+                gddraco::log_info("No bones for primitive " + String::num_int64(r));
             }
             
             int weights_id = -4;
             if (dic_attributes.has("WEIGHTS_0")) {
                 weights_id = dic_attributes["WEIGHTS_0"];
+            } else {
+                gddraco::log_info("No weights for primitive " + String::num_int64(r));
             }
 
             if (!dic_primitive.has("indices")) {
-                UtilityFunctions::printerr("Skipping primitive " + String::num_int64(r) + " due to no indices key");
+                gddraco::log_warn("Skipping primitive " + String::num_int64(r) + " due to missing 'indices' key");
                 continue;
             }
             int indices_id = dic_primitive["indices"];
@@ -161,11 +173,14 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
             int material_Idx = -5;
             if (dic_primitive.has("material")) {
                 material_Idx = dic_primitive["material"];
+            } else {
+                gddraco::log_info("No material for primitive " + String::num_int64(r) + ". Proceding with default value.");
             }
 
             //Decode Mesh
             Ref<ArrayMesh> primitive = decode_draco_mesh(buffer, position_id, normal_id, uv_id, joints_id, weights_id, indices_id);
             if (primitive == nullptr) {
+                gddraco::log_error("Failed to decode Draco primitive at index " + String::num_int64(r));
                 return ERR_INVALID_DATA; 
             }
             //UtilityFunctions::print("Primitive Decoded!");
@@ -210,6 +225,7 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
 //Adds the passed primitive to the importer_mesh passsed
 Ref<ImporterMesh> GDDraco::add_primitive_to_importer_mesh(const Ref<ArrayMesh> &source_mesh, Ref<ImporterMesh> importer_mesh) {
 	if (source_mesh.is_null()) {
+        gddraco::log_warn("Source mesh is null in add_primitive_to_importer_mesh.");
 		return importer_mesh;
 	}
 
@@ -270,26 +286,26 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
     //Verify if buffer ids are different
     std::set<int> buffer_ids = {position_id, normal_id, uv_id, joints_id, weights_id, indices_id};
     if (buffer_ids.size() < 6) {
-        ERR_FAIL_COND_V_MSG(true, nullptr, "One or more invalid buffer ids.");
+        gddraco::log_error("One or more invalid or duplicate buffer ids detected.");
         return nullptr;
     }
 
     //Set Up decoder
     Decoder *decoder = decoderCreate();
     if (!decoder) {
-        ERR_FAIL_COND_V_MSG(true, nullptr, "Failed to create Draco decoder");
+        gddraco::log_error("Failed to create Draco decoder.");
         return nullptr;
     }
 
     //Decode compressed buffer
     if (compressed_buffer.size() < 32) {
         decoderRelease(decoder);
-        ERR_FAIL_V_MSG(nullptr, "Compressed buffer too small");
+        gddraco::log_error("Compressed buffer too small.");
         return nullptr;
     }
     if (!decoderDecode(decoder, (void *)compressed_buffer.ptr(), compressed_buffer.size())) {
         decoderRelease(decoder);
-        ERR_FAIL_COND_V_MSG(true, nullptr, "Failed to decode Draco buffer");
+        gddraco::log_error("Failed to decode Draco buffer.");
         return nullptr;
     }
 
@@ -298,7 +314,7 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
     uint32_t index_count = decoderGetIndexCount(decoder);
     if (vertex_count == 0 || index_count == 0) {
         decoderRelease(decoder);
-        ERR_FAIL_COND_V_MSG(true, nullptr, "Decoded mesh has zero vertices or indices");
+        gddraco::log_error("Decoded mesh has zero vertices or indices.");
         return nullptr;
     }
 
@@ -321,19 +337,14 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
     // Decode POSITION (required) 
     if (position_id < 0) {
         decoderRelease(decoder);
-        ERR_FAIL_COND_V_MSG(true, nullptr, "No Position buffer in current mesh. Please provide a valid GLTF to decode.");
+        gddraco::log_error("No Position buffer in current mesh. Please provide a valid GLTF to decode.");
+        return nullptr;
     }
     positions.resize(static_cast<int64_t>(vertex_count));
 
     if (!decoderReadAttribute(decoder, position_id, 5126, "VEC3")) {
         decoderRelease(decoder);
-        ERR_FAIL_COND_V_MSG(true, nullptr, "Failed to decode POSITION attribute");
-        return nullptr;
-    }
-    void *test_ptr = positions.ptrw();
-    if (!test_ptr) {
-        decoderRelease(decoder);
-        ERR_FAIL_COND_V_MSG(true, nullptr, "positions.ptrw() is NULL");
+        gddraco::log_error("Failed to decode POSITION attribute");
         return nullptr;
     }
     decoderCopyAttribute(decoder, position_id, positions.ptrw());
@@ -343,6 +354,7 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
         decoderCopyAttribute(decoder, normal_id, normals.ptrw());
     } else {
         normals.resize(0);
+        gddraco::log_warn("Failed to decode Primitive's Normals");
     }
 
     // Decode TEXCOORD_0 (optional)
@@ -350,6 +362,7 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
         decoderCopyAttribute(decoder, uv_id, uvs.ptrw());
     } else {
         uvs.resize(0);
+        gddraco::log_warn("Failed to decode Primitive's UV");
     }
 
     // Decode JOINTS_0 (optional)
@@ -370,6 +383,7 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
         }
     } else {
         joints.resize(0);
+        gddraco::log_warn("Failed to decode Primitive's joints");
     }
 
     // Decode WEIGHTS_0 (optional)
@@ -377,12 +391,13 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
         decoderCopyAttribute(decoder, weights_id, weights.ptrw());
     } else {
         weights.resize(0);
+        gddraco::log_warn("Failed to decode Primitive's weights");
     }
 
     // Decode INDICES (required)
     if (!decoderReadIndices(decoder, 5123)) { // 5123 = unsigned short indices
         decoderRelease(decoder);
-        ERR_FAIL_COND_V_MSG(true, nullptr, "Failed to decode indices");
+        gddraco::log_error("Failed to decode indices");
         return nullptr;
     }
 
@@ -411,33 +426,33 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
     if (positions.size() == vertex_count) {
         arrays[Mesh::ARRAY_VERTEX] = positions;
     } else {
-        ERR_FAIL_COND_V_MSG(true, nullptr, "Invalid positions. Please provide a valid GLTF to decode.");
+        gddraco::log_error("Invalid positions. Please provide a valid GLTF to decode.");
         return nullptr;
     }
     if (normal_id >= 0 && normals.size() == vertex_count) {
         arrays[Mesh::ARRAY_NORMAL] = normals;
     } else {
-        UtilityFunctions::print("Failed to set Primitive's Normals");
+        gddraco::log_warn("Failed to set Primitive's Normals");
     }
     if (uv_id >= 0 && uvs.size() == vertex_count) {
         arrays[Mesh::ARRAY_TEX_UV] = uvs;
     } else {
-        UtilityFunctions::print("Failed to set Primitive's UV");
+        gddraco::log_warn("Failed to set Primitive's UV");
     }
     if (joints_id >= 0 && joints.size() == joint_element_count) {
         arrays[Mesh::ARRAY_BONES] = joints;
     } else {
-        UtilityFunctions::print("Failed to set Primitive's Joints/Bones");
+       gddraco::log_warn("Failed to set Primitive's Joints/Bones");
     }
     if (weights_id >= 0 && weights.size() == weight_element_count) {
         arrays[Mesh::ARRAY_WEIGHTS] = weights;
     } else {
-        UtilityFunctions::print("Failed to set Primitive's Normals");
+        gddraco::log_warn("Failed to set Primitive's Normals");
     }
     if (indices.size() == index_count) {
         arrays[Mesh::ARRAY_INDEX] = indices;
     } else {
-        ERR_FAIL_COND_V_MSG(true, nullptr, "Invalid Indices. Please provide a valid GLTF to decode.");
+        gddraco::log_error("Invalid Indices. Please provide a valid GLTF to decode.");
         return nullptr;
     }
 
