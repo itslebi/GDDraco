@@ -414,22 +414,22 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
         ERR_FAIL_COND_V_MSG(true, nullptr, "Invalid positions. Please provide a valid GLTF to decode.");
         return nullptr;
     }
-    if (normal_id > 0 && normals.size() == vertex_count) {
+    if (normal_id >= 0 && normals.size() == vertex_count) {
         arrays[Mesh::ARRAY_NORMAL] = normals;
     } else {
         UtilityFunctions::print("Failed to set Primitive's Normals");
     }
-    if (uv_id > 0 && uvs.size() == vertex_count) {
+    if (uv_id >= 0 && uvs.size() == vertex_count) {
         arrays[Mesh::ARRAY_TEX_UV] = uvs;
     } else {
         UtilityFunctions::print("Failed to set Primitive's UV");
     }
-    if (joints_id > 0 && joints.size() == joint_element_count) {
+    if (joints_id >= 0 && joints.size() == joint_element_count) {
         arrays[Mesh::ARRAY_BONES] = joints;
     } else {
         UtilityFunctions::print("Failed to set Primitive's Joints/Bones");
     }
-    if (weights_id > 0 && weights.size() == weight_element_count) {
+    if (weights_id >= 0 && weights.size() == weight_element_count) {
         arrays[Mesh::ARRAY_WEIGHTS] = weights;
     } else {
         UtilityFunctions::print("Failed to set Primitive's Normals");
@@ -442,6 +442,7 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
     }
 
     mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
+    mesh->regen_normal_maps(); // May be unnecessary
 
     return mesh;
 }
