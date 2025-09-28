@@ -27,6 +27,8 @@
 #include "draco/core/decoder_buffer.h"
 #include "draco/compression/decode.h"
 
+#include "headers/convert.hpp" // Header for [GDDraco Patch] by itslebi, 3Onions
+
 #define LOG_PREFIX "DracoDecoder | "
 
 struct Decoder
@@ -166,6 +168,30 @@ void decoderCopyAttribute(Decoder *decoder, size_t id, void *output)
     }
 }
 
+// [GDDraco Patch] Replaced raw index decoding with helper function
+// Patch License Info
+// MIT License
+// Copyright (c) 2025 itslebi, 3Onion
+template <class T>
+void decodeIndices(Decoder *decoder) {
+    std::vector<uint32_t> tmp_indices;
+    gddraco::fill_indices_tris(*decoder->mesh, tmp_indices);
+
+    std::vector<uint8_t> decodedIndices;
+    decodedIndices.resize(tmp_indices.size() * sizeof(T));
+    T *typedView = reinterpret_cast<T *>(decodedIndices.data());
+
+    for (size_t i = 0; i < tmp_indices.size(); ++i) {
+        typedView[i] = static_cast<T>(tmp_indices[i]);
+    }
+
+    decoder->indexBuffer = std::move(decodedIndices);
+}
+
+/*
+* Legacy implementation of decodeIndices<T>
+* Replaced by gddraco::fill_indices_tris
+* Patched Version above
 template <class T>
 void decodeIndices(Decoder *decoder)
 {
@@ -183,6 +209,7 @@ void decodeIndices(Decoder *decoder)
 
     decoder->indexBuffer = decodedIndices;
 }
+*/
 
 bool decoderReadIndices(Decoder *decoder, size_t indexComponentType)
 {
