@@ -3,7 +3,7 @@
 
 This GDExtension adds support to the Godot Engine for importing `.gltf` and `.glb` files with **Draco-compressed meshes** via the [`KHR_draco_mesh_compression`](https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_draco_mesh_compression/README.md) extension.
 
-This extension uses the Draco Decoder found in Blender's [Draco SDK Wrapper](https://github.com/blender/blender/tree/2d4984493155e3f23eed34dcae8e7afe08aefbde).
+This extension uses the Draco Decoder found in Blender's [Draco SDK Wrapper](https://github.com/blender/blender/tree/2d4984493155e3f23eed34dcae8e7afe08aefbde) and it uses the official [Draco SDK](https://github.com/google/draco/commit/3abbc66fdf5597b1560c44ce7840aac76900b3f7) version 1.5.7.
 
 ---
 
@@ -63,6 +63,7 @@ You can import your `.glb` and `.gltf` now.
 - [Python](https://www.python.org/)
 - [SCons](https://scons.org/) (used for building)  
 _⚠️ [Godot CPP](https://github.com/godotengine/godot-cpp) is used by this project and is provided in the source code already._
+_⚠️ [Draco SDK](https://github.com/google/draco) is used by this project and is provided in the source code already._
 _⚠️ [VS Code](https://code.visualstudio.com/) is recommended and the base import path settings are provided._
 
 ### 1. Clone the Repository
