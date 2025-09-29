@@ -245,3 +245,27 @@ void decoderCopyIndices(Decoder *decoder, void *output)
 {
     memcpy(output, decoder->indexBuffer.data(), decoder->indexBuffer.size());
 }
+
+
+// [GDDraco Patch] Patch Normals by flipping
+// Patch License Info
+// MIT License
+// Copyright (c) 2025 itslebi
+#include "headers/logging.hpp"
+namespace gddraco {
+    //Normals Fix
+    void decoderCopyAttributeVec3f(Decoder *decoder, size_t id, godot::Vector3 *output) {
+        auto iter = decoder->buffers.find(id);
+        if (iter == decoder->buffers.end()) return;
+
+        const uint8_t *data = iter->second.data();
+        size_t count = decoder->vertexCount;
+
+        for (size_t i = 0; i < count; ++i) {
+            const float *src = reinterpret_cast<const float *>(data + i * sizeof(float) * 3);
+            godot::Vector3 n = godot::Vector3(-src[0], -src[1], -src[2]).normalized();
+            output[i] = n;
+        }
+    }
+}
+//End Patch

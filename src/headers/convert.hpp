@@ -26,7 +26,6 @@
 #define GDDRACO_CONVERT_HPP
 
 #include <cstdint>
-#include "draco/mesh/mesh.h"
 
 namespace gddraco {
 
