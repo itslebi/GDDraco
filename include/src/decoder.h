@@ -63,3 +63,15 @@ decoderGetIndicesByteLength(Decoder *decoder);
 
 API(void)
 decoderCopyIndices(Decoder *decoder, void *output);
+
+// [GDDraco Patch] Patch Normals by flipping
+// Patch License Info
+// MIT License
+// Copyright (c) 2025 itslebi
+#include <godot_cpp/variant/vector3.hpp>
+
+namespace gddraco {
+    //Normals Fix
+    void decoderCopyAttributeVec3f(Decoder *decoder, size_t id, godot::Vector3 *output);
+}
+//End Patch

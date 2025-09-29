@@ -86,8 +86,9 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
 
         //Get Mesh Name
         String mesh_name = "Mesh";
-        if (dic_mesh.has("primitives")) {
+        if (!dic_mesh.has("name")) {
             gddraco::log_warn("No name found for this primitive. Using default name `Mesh`.");
+        } else {
             mesh_name = dic_mesh["name"];
         }
 
@@ -211,11 +212,10 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
                 importer_mesh->set_surface_name(t, mesh_name);
             }
 
-            //UtilityFunctions::print("Created ImpoterMesh!");
             Ref<GLTFMesh> mesh_to_change = meshes_mesh[i];
             mesh_to_change->set_original_name(mesh_name);
             mesh_to_change->set_mesh(importer_mesh);
-            //UtilityFunctions::print("Mesh is set!");
+            gddraco::log_info("Mesh imported successfully.");
         }
     }
 
@@ -351,7 +351,7 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
 
     // Decode NORMAL (optional)
     if (normal_id >= 0 && decoderReadAttribute(decoder, normal_id, 5126, "VEC3")) {
-        decoderCopyAttribute(decoder, normal_id, normals.ptrw());
+        gddraco::decoderCopyAttributeVec3f(decoder, normal_id, normals.ptrw());
     } else {
         normals.resize(0);
         gddraco::log_warn("Failed to decode Primitive's Normals");
@@ -457,7 +457,6 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
     }
 
     mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
-    mesh->regen_normal_maps(); // May be unnecessary
 
     return mesh;
 }
