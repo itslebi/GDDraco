@@ -14,7 +14,7 @@ try:
     if ARGUMENTS["target"] == "template_release":
         if env.get("platform") == "windows":
             env.Append(CCFLAGS=["/O2"])
-        else:
+        else: #Remove -flto if on WSL you get Permission denied error
             env.Append(CCFLAGS=["-O3", "-fno-exceptions", "-fno-rtti", "-flto"])
             env.Append(LINKFLAGS=["-s", "-flto"])
     env.Append(CCFLAGS=[
