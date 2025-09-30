@@ -5,6 +5,8 @@ Copyright (c) 2025 itslebi
 This software is licensed under the MIT License.
 See the LICENSE file for details.
 
+Version: GDDraco v1.0.1 - Godot v4.5
+
 ---
 
 Third-Party Components:
