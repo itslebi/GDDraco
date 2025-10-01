@@ -38,20 +38,26 @@
 #include <cstdint>
 #include <cstdlib>
 
-#include <set>
+#include <vector>
 
 #include "PrimitiveData.hpp"
+#include "AttributeStorer.hpp"
 #include "headers/logging.hpp"
+#include "headers/templates.hpp"
 
 namespace godot {
     class GDDraco: public GLTFDocumentExtension {
         GDCLASS(GDDraco,GLTFDocumentExtension);
 
+        private:
+            //Helper Method to handle weights
+            PackedFloat32Array decode_and_normalize_weights(const PackedByteArray &raw_data, int vertex_count, int components_per_vertex, int comp_type);
+
         protected:
             static void _bind_methods();
 
             //Custom method to connect with Draco Decoder from the Draco Wrapper
-            Ref<ArrayMesh> decode_draco_mesh(const PackedByteArray &compressed_buffer, int position_id, int normal_id, int uv_id, int joints_id, int weights_id, int indices_id);
+            Ref<ArrayMesh> decode_draco_mesh(const PackedByteArray &compressed_buffer, int indices_id, std::vector<AttributeStorer> &vec_attr);
 
             //Method that grabs the decoded mesh and adds it to an ImporterMesh
             Ref<ImporterMesh> add_primitive_to_importer_mesh(const Ref<ArrayMesh> &source_mesh, Ref<ImporterMesh> importer_mesh);

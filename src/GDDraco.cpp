@@ -61,6 +61,7 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
 
     // Get buffer views from GLTFState
     TypedArray<Ref<GLTFBufferView>> buffer_views = p_state->get_buffer_views();
+    TypedArray<Ref<GLTFAccessor>> acessors = p_state->get_accessors();
 
     //Get the JSON
     Dictionary json = p_state->get_json();
@@ -96,6 +97,14 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
         for (int r = 0; r < (int)arr_primitives.size(); r++) {
             Dictionary dic_primitive = arr_primitives[r];
 
+            //Get Ids for Attribute
+            if (!dic_primitive.has("attributes")) {
+                gddraco::log_warn("Skipping primitive " + String::num_int64(r) + " due to missing 'attributes' key");
+                continue;
+            }
+            Dictionary dic_attributes = dic_primitive["attributes"];
+
+            //Get Ids for Buffer
             if (!dic_primitive.has("extensions")) {
                 gddraco::log_warn("Skipping primitive " + String::num_int64(r) + " due to missing 'extensions' key");
                 continue;
@@ -128,41 +137,33 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
                 gddraco::log_warn("Skipping primitive " + String::num_int64(r) + " due to missing 'attributes' key");
                 continue;
             }
-            Dictionary dic_attributes = dic_KHR_draco_mesh_compression["attributes"];
+            Dictionary dic_KHR_attributes = dic_KHR_draco_mesh_compression["attributes"];
+            //Get Attributes data
+            Array attribute_keys = dic_KHR_attributes.keys();
 
-            //GET ATTRIBUTES DATA
-            if (!dic_attributes.has("POSITION")) {
+            std::vector<AttributeStorer> vec_attr;
+
+            for (int i = 0; i < attribute_keys.size(); i++) {
+                String semantic = attribute_keys[i];
+                int draco_attribute_id = dic_KHR_attributes[semantic];
+                if (!dic_attributes.has(semantic)) {
+                    gddraco::log_error("No attribute " + semantic + " found. File Error!");
+                }
+                int acessor_IDX = dic_attributes[semantic];
+                Ref<GLTFAccessor> acc = acessors[acessor_IDX];
+                AttributeStorer a = AttributeStorer(semantic, acc->get_component_type(), acc->get_accessor_type(), draco_attribute_id,
+                                                    acc->get_count(), acc->get_normalized());
+
+                vec_attr.push_back(a);
+            }
+
+
+            //____________________________________________
+
+            //GET KHR ATTRIBUTES DATA
+            if (!dic_KHR_attributes.has("POSITION")) {
                 gddraco::log_warn("Skipping primitive " + String::num_int64(r) + " due to missing 'POSITION' attribute");
                 continue;
-            }
-            int position_id = dic_attributes["POSITION"];
-
-            int normal_id = -1;
-            if (dic_attributes.has("NORMAL")) {
-                normal_id = dic_attributes["NORMAL"];
-            } else {
-                gddraco::log_info("No normal for primitive " + String::num_int64(r) + ". Proceding with default value.");
-            }
-
-            int uv_id = -2;
-            if (dic_attributes.has("TEXCOORD_0")) {
-                uv_id = dic_attributes["TEXCOORD_0"];
-            } else {
-                gddraco::log_info("No uv for primitive " + String::num_int64(r)  + ". Proceding with default value.");
-            }
-
-            int joints_id = -3;
-            if (dic_attributes.has("JOINTS_0")) {
-                joints_id = dic_attributes["JOINTS_0"];
-            } else {
-                gddraco::log_info("No bones for primitive " + String::num_int64(r));
-            }
-            
-            int weights_id = -4;
-            if (dic_attributes.has("WEIGHTS_0")) {
-                weights_id = dic_attributes["WEIGHTS_0"];
-            } else {
-                gddraco::log_info("No weights for primitive " + String::num_int64(r));
             }
 
             if (!dic_primitive.has("indices")) {
@@ -171,7 +172,7 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
             }
             int indices_id = dic_primitive["indices"];
 
-            int material_Idx = -5;
+            int material_Idx = -2;
             if (dic_primitive.has("material")) {
                 material_Idx = dic_primitive["material"];
             } else {
@@ -179,7 +180,7 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
             }
 
             //Decode Mesh
-            Ref<ArrayMesh> primitive = decode_draco_mesh(buffer, position_id, normal_id, uv_id, joints_id, weights_id, indices_id);
+            Ref<ArrayMesh> primitive = decode_draco_mesh(buffer, indices_id, vec_attr);
             if (primitive == nullptr) {
                 gddraco::log_error("Failed to decode Draco primitive at index " + String::num_int64(r));
                 return ERR_INVALID_DATA; 
@@ -278,17 +279,40 @@ Ref<ImporterMesh> GDDraco::add_primitive_to_importer_mesh(const Ref<ArrayMesh> &
 	return importer_mesh;
 }
 
+PackedFloat32Array GDDraco::decode_and_normalize_weights(const PackedByteArray &raw_data, int vertex_count, int components_per_vertex, int comp_type) {
+    int64_t element_count = static_cast<int64_t>(vertex_count) * components_per_vertex;
+    PackedFloat32Array result;
+    result.resize(element_count);
 
-// Function that handles calling the Draco Decoder
-Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buffer, int position_id, int normal_id, int uv_id, int joints_id, int weights_id, int indices_id) {
-    //UtilityFunctions::print("GDDraco::decode_draco_mesh");
+    float *dst = result.ptrw();
 
-    //Verify if buffer ids are different
-    std::set<int> buffer_ids = {position_id, normal_id, uv_id, joints_id, weights_id, indices_id};
-    if (buffer_ids.size() < 6) {
-        gddraco::log_error("One or more invalid or duplicate buffer ids detected.");
-        return nullptr;
+    switch (comp_type) {
+        case 5121: { // uint8
+            const uint8_t *src = reinterpret_cast<const uint8_t *>(raw_data.ptr());
+            for (int64_t i = 0; i < element_count; ++i) {
+                dst[i] = gddraco::normalize_component<uint8_t>(src[i], 255);
+            }
+            break;
+        }
+        case 5123: { // uint16
+            const uint16_t *src = reinterpret_cast<const uint16_t *>(raw_data.ptr());
+            for (int64_t i = 0; i < element_count; ++i) {
+                dst[i] = gddraco::normalize_component<uint16_t>(src[i], 65535);
+            }
+            break;
+        }
+        default:
+            // Unsupported type
+            result.resize(0);
+            gddraco::log_error("Unsupported WEIGHTS component type: " + godot::String::num_int64(comp_type));
+            break;
     }
+
+    return result;
+}
+
+Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buffer, int indices_id, std::vector<AttributeStorer> &vec_attr) {
+    //UtilityFunctions::print("GDDraco::decode_draco_mesh");
 
     //Set Up decoder
     Decoder *decoder = decoderCreate();
@@ -318,80 +342,157 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
         return nullptr;
     }
 
-    //Create necessary variables
-    PackedVector3Array positions;
-    PackedVector3Array normals;
-    PackedVector2Array uvs;
-    PackedInt32Array joints;
-    PackedFloat32Array weights;
+    // Predeclare array storage for mesh attributes
+    Array arrays;
+    arrays.resize(Mesh::ARRAY_MAX);
 
-    normals.resize(static_cast<int64_t>(vertex_count));
-    uvs.resize(static_cast<int64_t>(vertex_count));
+    // Iterate through vec_attr to decode and assign attributes dynamically
+    for (const AttributeStorer &attr : vec_attr) {
+        const godot::String &name = attr.name;
+        int id = attr.draco_ID;
+        int count = attr.count;
+        bool normalized = attr.normalized;
+        int comp_type = attr.get_comp_type();
+        char *acc_type = attr.get_acc_type();
+        int components_per_vertex = gddraco::get_component_count(acc_type);
 
-    const int64_t joint_element_count = static_cast<int64_t>(vertex_count) * 4;
-    joints.resize(joint_element_count);
-    
-    const int64_t weight_element_count = static_cast<int64_t>(vertex_count) * 4;
-    weights.resize(weight_element_count);
+        if (id < 0) {
+            gddraco::log_warn("Attribute ID is invalid for: " + name);
+            continue;
+        }
 
-    // Decode POSITION (required) 
-    if (position_id < 0) {
-        decoderRelease(decoder);
-        gddraco::log_error("No Position buffer in current mesh. Please provide a valid GLTF to decode.");
-        return nullptr;
-    }
-    positions.resize(static_cast<int64_t>(vertex_count));
+        // Decode attribute
+        if (!decoderReadAttribute(decoder, id, comp_type, acc_type)) {
+            gddraco::log_warn("Failed to decode attribute: " + name);
+            continue;
+        }
 
-    if (!decoderReadAttribute(decoder, position_id, 5126, "VEC3")) {
-        decoderRelease(decoder);
-        gddraco::log_error("Failed to decode POSITION attribute");
-        return nullptr;
-    }
-    decoderCopyAttribute(decoder, position_id, positions.ptrw());
+        // Match name to appropriate mesh array slot
+        if (name == "POSITION") {
+            PackedVector3Array positions;
+            positions.resize(static_cast<int64_t>(vertex_count));
+            decoderCopyAttribute(decoder, id, positions.ptrw());
+            arrays[Mesh::ARRAY_VERTEX] = positions;
+        } else if (name == "NORMAL") {
+            PackedVector3Array normals;
+            normals.resize(static_cast<int64_t>(vertex_count));
+            gddraco::decoderCopyAttributeVec3f(decoder, id, normals.ptrw());
+            arrays[Mesh::ARRAY_NORMAL] = normals;
+        } else if (name.begins_with("TEXCOORD_")) {
+            int index = name.get_slicec('_', 1).to_int();
+            PackedVector2Array uvs;
+            uvs.resize(static_cast<int64_t>(vertex_count));
+            decoderCopyAttribute(decoder, id, uvs.ptrw());
+            arrays[Mesh::ARRAY_TEX_UV + index] = uvs;
+        } else if (name == "JOINTS_0") {
+            int element_count = static_cast<int64_t>(vertex_count) * components_per_vertex;
 
-    // Decode NORMAL (optional)
-    if (normal_id >= 0 && decoderReadAttribute(decoder, normal_id, 5126, "VEC3")) {
-        gddraco::decoderCopyAttributeVec3f(decoder, normal_id, normals.ptrw());
-    } else {
-        normals.resize(0);
-        gddraco::log_warn("Failed to decode Primitive's Normals");
-    }
+            PackedInt32Array joints;
+            joints.resize(element_count);
 
-    // Decode TEXCOORD_0 (optional)
-    if (uv_id >= 0 && decoderReadAttribute(decoder, uv_id, 5126, "VEC2")) {
-        decoderCopyAttribute(decoder, uv_id, uvs.ptrw());
-    } else {
-        uvs.resize(0);
-        gddraco::log_warn("Failed to decode Primitive's UV");
-    }
+            // Calculate raw data size based on comp_type size (5121 = 1 byte, 5123 = 2 bytes, etc.)
+            int comp_size_bytes = 0;
+            switch (comp_type) {
+                case 5121: comp_size_bytes = 1; break;  // GL_UNSIGNED_BYTE
+                case 5123: comp_size_bytes = 2; break;  // GL_UNSIGNED_SHORT
+                case 5125: comp_size_bytes = 4; break;  // GL_UNSIGNED_INT
+                default:
+                    gddraco::log_error("Unsupported JOINTS component type");
+                    continue;  // skip this attribute
+            }
 
-    // Decode JOINTS_0 (optional)
-    // Allocate temporary raw data buffer for joints (uint16_t, 2 bytes each)
-    PackedByteArray raw_joint_data;
-    raw_joint_data.resize(joint_element_count * 2); // 2 bytes per uint16_t
+            PackedByteArray raw_joint_data;
+            raw_joint_data.resize(element_count * comp_size_bytes);
 
-    if (joints_id >= 0 && decoderReadAttribute(decoder, joints_id, 5123, "VEC4")) {
-        decoderCopyAttribute(decoder, joints_id, raw_joint_data.ptrw());
+        decoderCopyAttribute(decoder, id, raw_joint_data.ptrw());
 
-        // Pointers to source (uint16_t) and destination (int32_t) arrays
-        const uint16_t *src_joint = reinterpret_cast<const uint16_t *>(raw_joint_data.ptr());
         int32_t *dst = joints.ptrw();
 
-        // Convert each uint16_t joint index to int32_t explicitly
-        for (int64_t i = 0; i < joint_element_count; i++) {
-            dst[i] = static_cast<int32_t>(src_joint[i]);
+        if (comp_type == 5121) {
+            const uint8_t* src = reinterpret_cast<const uint8_t*>(raw_joint_data.ptr());
+            for (int64_t i = 0; i < element_count; i++) {
+                dst[i] = static_cast<int32_t>(src[i]);
+            }
+        } else if (comp_type == 5123) {
+            const uint16_t* src = reinterpret_cast<const uint16_t*>(raw_joint_data.ptr());
+            for (int64_t i = 0; i < element_count; i++) {
+                dst[i] = static_cast<int32_t>(src[i]);
+            }
+        } else if (comp_type == 5125) {
+            const uint32_t* src = reinterpret_cast<const uint32_t*>(raw_joint_data.ptr());
+            for (int64_t i = 0; i < element_count; i++) {
+                dst[i] = static_cast<int32_t>(src[i]);
+            }
         }
-    } else {
-        joints.resize(0);
-        gddraco::log_warn("Failed to decode Primitive's joints");
-    }
 
-    // Decode WEIGHTS_0 (optional)
-    if (weights_id >= 0 && decoderReadAttribute(decoder, weights_id, 5126, "VEC4")) {
-        decoderCopyAttribute(decoder, weights_id, weights.ptrw());
-    } else {
-        weights.resize(0);
-        gddraco::log_warn("Failed to decode Primitive's weights");
+        arrays[Mesh::ARRAY_BONES] = joints;
+        gddraco::log_warn("Joints decoded dynamically.");
+        } else if (name == "WEIGHTS_0") {
+            int comp_size_bytes = 0;
+            switch (comp_type) {
+                case 5121: comp_size_bytes = 1; break;  // GL_UNSIGNED_BYTE
+                case 5123: comp_size_bytes = 2; break;  // GL_UNSIGNED_SHORT
+                case 5126: comp_size_bytes = 4; break;  // GL_FLOAT
+                default:
+                    gddraco::log_error("Unsupported WEIGHTS component type");
+                    continue;  // skip this attribute
+            }
+            if (normalized && (comp_type == 5121 || comp_type == 5123)) {
+                PackedByteArray raw;
+                raw.resize(vertex_count * components_per_vertex * comp_size_bytes);
+                decoderCopyAttribute(decoder, id, raw.ptrw());
+
+                PackedFloat32Array weights = decode_and_normalize_weights(raw, vertex_count, components_per_vertex, comp_type);
+                arrays[Mesh::ARRAY_WEIGHTS] = weights;
+            } else {
+                PackedFloat32Array weights;
+                weights.resize(vertex_count * components_per_vertex);
+                decoderCopyAttribute(decoder, id, weights.ptrw());
+                arrays[Mesh::ARRAY_WEIGHTS] = weights;
+            }
+        } else if (name.begins_with("COLOR_0")) {
+            PackedColorArray colors;
+            colors.resize(static_cast<int64_t>(vertex_count));
+
+            if (comp_type == 5126 /* float */ && strcmp(acc_type, "VEC4") == 0) {
+                // Directly decode into Color array
+                decoderCopyAttribute(decoder, id, colors.ptrw());
+            } else if ((comp_type == 5121 || comp_type == 5123) && normalized) {
+                // Normalize raw data depending on byte size and components
+                int bytes_per_component = (comp_type == 5121) ? 1 : 2;
+                PackedByteArray raw;
+                raw.resize(static_cast<int64_t>(vertex_count) * components_per_vertex * bytes_per_component);
+                decoderCopyAttribute(decoder, id, raw.ptrw());
+
+                Color *dst = colors.ptrw();
+
+                if (comp_type == 5121) {
+                    const uint8_t *src = reinterpret_cast<const uint8_t *>(raw.ptr());
+                    for (int64_t i = 0; i < static_cast<int64_t>(vertex_count); ++i) {
+                        float r = components_per_vertex > 0 ? src[i * components_per_vertex + 0] / 255.0f : 0.0f;
+                        float g = components_per_vertex > 1 ? src[i * components_per_vertex + 1] / 255.0f : 0.0f;
+                        float b = components_per_vertex > 2 ? src[i * components_per_vertex + 2] / 255.0f : 0.0f;
+                        float a = components_per_vertex > 3 ? src[i * components_per_vertex + 3] / 255.0f : 1.0f;
+                        dst[i] = Color(r, g, b, a);
+                    }
+                } else if (comp_type == 5123) {
+                    const uint16_t *src = reinterpret_cast<const uint16_t *>(raw.ptr());
+                    for (int64_t i = 0; i < static_cast<int64_t>(vertex_count); ++i) {
+                        float r = components_per_vertex > 0 ? src[i * components_per_vertex + 0] / 65535.0f : 0.0f;
+                        float g = components_per_vertex > 1 ? src[i * components_per_vertex + 1] / 65535.0f : 0.0f;
+                        float b = components_per_vertex > 2 ? src[i * components_per_vertex + 2] / 65535.0f : 0.0f;
+                        float a = components_per_vertex > 3 ? src[i * components_per_vertex + 3] / 65535.0f : 1.0f;
+                        dst[i] = Color(r, g, b, a);
+                    }
+                }
+            } else {
+                gddraco::log_warn("Unsupported COLOR_0 format: comp_type = " + godot::String::num_int64(comp_type));
+                continue;
+            }
+            arrays[Mesh::ARRAY_COLOR] = colors;
+        } else {
+            gddraco::log_warn("Unhandled attribute name: " + name + ". Attribute not supported!");
+        }
     }
 
     // Decode INDICES (required)
@@ -412,51 +513,13 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
     for (uint32_t i = 0; i < index_count; ++i) {
         indices[i] = static_cast<int32_t>(src_idx[i]);
     }
-
+    arrays[Mesh::ARRAY_INDEX] = indices;
 
     decoderRelease(decoder);
 
-    // Now create ArrayMesh
     Ref<ArrayMesh> mesh;
     mesh.instantiate();
-
-    Array arrays;
-    arrays.resize(Mesh::ARRAY_MAX);
-
-    if (positions.size() == vertex_count) {
-        arrays[Mesh::ARRAY_VERTEX] = positions;
-    } else {
-        gddraco::log_error("Invalid positions. Please provide a valid GLTF to decode.");
-        return nullptr;
-    }
-    if (normal_id >= 0 && normals.size() == vertex_count) {
-        arrays[Mesh::ARRAY_NORMAL] = normals;
-    } else {
-        gddraco::log_warn("Failed to set Primitive's Normals");
-    }
-    if (uv_id >= 0 && uvs.size() == vertex_count) {
-        arrays[Mesh::ARRAY_TEX_UV] = uvs;
-    } else {
-        gddraco::log_warn("Failed to set Primitive's UV");
-    }
-    if (joints_id >= 0 && joints.size() == joint_element_count) {
-        arrays[Mesh::ARRAY_BONES] = joints;
-    } else {
-       gddraco::log_warn("Failed to set Primitive's Joints/Bones");
-    }
-    if (weights_id >= 0 && weights.size() == weight_element_count) {
-        arrays[Mesh::ARRAY_WEIGHTS] = weights;
-    } else {
-        gddraco::log_warn("Failed to set Primitive's Normals");
-    }
-    if (indices.size() == index_count) {
-        arrays[Mesh::ARRAY_INDEX] = indices;
-    } else {
-        gddraco::log_error("Invalid Indices. Please provide a valid GLTF to decode.");
-        return nullptr;
-    }
-
     mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
-
     return mesh;
 }
+

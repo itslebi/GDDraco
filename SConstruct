@@ -5,6 +5,7 @@ env = SConscript("godot-cpp/SConstruct")
 
 env.Append(CPPPATH=[
     "src/",
+    "src/headers",
     "include/draco/src",
     "include"
     ])
@@ -28,6 +29,7 @@ except Exception as e:
 sources = (
     # GDDraco Source
     Glob("src/*cpp") +
+    Glob("src/headers/*.cpp") +
     # Godot CPP Source
     Glob("include/src/*.cpp") +
     # Draco SDK Source
