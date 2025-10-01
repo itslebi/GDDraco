@@ -279,12 +279,11 @@ Ref<ImporterMesh> GDDraco::add_primitive_to_importer_mesh(const Ref<ArrayMesh> &
 	return importer_mesh;
 }
 
-PackedFloat32Array GDDraco::decode_and_normalize_weights(const PackedByteArray &raw_data, int vertex_count, int components_per_vertex, int comp_type) {
+void GDDraco::decode_and_normalize_weights(const PackedByteArray &raw_data, int vertex_count, int components_per_vertex, int comp_type, PackedFloat32Array &out_result) {
     int64_t element_count = static_cast<int64_t>(vertex_count) * components_per_vertex;
-    PackedFloat32Array result;
-    result.resize(element_count);
+    out_result.resize(element_count);
 
-    float *dst = result.ptrw();
+    float *dst = out_result.ptrw();
 
     switch (comp_type) {
         case 5121: { // uint8
@@ -302,14 +301,39 @@ PackedFloat32Array GDDraco::decode_and_normalize_weights(const PackedByteArray &
             break;
         }
         default:
-            // Unsupported type
-            result.resize(0);
+            out_result.resize(0);
             gddraco::log_error("Unsupported WEIGHTS component type: " + godot::String::num_int64(comp_type));
             break;
     }
-
-    return result;
 }
+
+void GDDraco::decode_normalized_color(const PackedByteArray &raw_data, int vertex_count, int components_per_vertex, int comp_type, PackedColorArray &out_colors) {
+    out_colors.resize(vertex_count);
+    Color *dst = out_colors.ptrw();
+
+    if (comp_type == 5121) {
+        const uint8_t *src = reinterpret_cast<const uint8_t *>(raw_data.ptr());
+        for (int64_t i = 0; i < vertex_count; ++i) {
+            float r = components_per_vertex > 0 ? src[i * components_per_vertex + 0] / 255.0f : 0.0f;
+            float g = components_per_vertex > 1 ? src[i * components_per_vertex + 1] / 255.0f : 0.0f;
+            float b = components_per_vertex > 2 ? src[i * components_per_vertex + 2] / 255.0f : 0.0f;
+            float a = components_per_vertex > 3 ? src[i * components_per_vertex + 3] / 255.0f : 1.0f;
+            dst[i] = Color(r, g, b, a);
+        }
+    } else if (comp_type == 5123) {
+        const uint16_t *src = reinterpret_cast<const uint16_t *>(raw_data.ptr());
+        for (int64_t i = 0; i < vertex_count; ++i) {
+            float r = components_per_vertex > 0 ? src[i * components_per_vertex + 0] / 65535.0f : 0.0f;
+            float g = components_per_vertex > 1 ? src[i * components_per_vertex + 1] / 65535.0f : 0.0f;
+            float b = components_per_vertex > 2 ? src[i * components_per_vertex + 2] / 65535.0f : 0.0f;
+            float a = components_per_vertex > 3 ? src[i * components_per_vertex + 3] / 65535.0f : 1.0f;
+            dst[i] = Color(r, g, b, a);
+        }
+    } else {
+        out_colors.resize(0); // Unsupported type
+    }
+}
+
 
 Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buffer, int indices_id, std::vector<AttributeStorer> &vec_attr) {
     //UtilityFunctions::print("GDDraco::decode_draco_mesh");
@@ -426,7 +450,6 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
         }
 
         arrays[Mesh::ARRAY_BONES] = joints;
-        gddraco::log_warn("Joints decoded dynamically.");
         } else if (name == "WEIGHTS_0") {
             int comp_size_bytes = 0;
             switch (comp_type) {
@@ -442,7 +465,8 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
                 raw.resize(vertex_count * components_per_vertex * comp_size_bytes);
                 decoderCopyAttribute(decoder, id, raw.ptrw());
 
-                PackedFloat32Array weights = decode_and_normalize_weights(raw, vertex_count, components_per_vertex, comp_type);
+                PackedFloat32Array weights;
+                decode_and_normalize_weights(raw, vertex_count, components_per_vertex, comp_type, weights);
                 arrays[Mesh::ARRAY_WEIGHTS] = weights;
             } else {
                 PackedFloat32Array weights;
@@ -452,39 +476,16 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
             }
         } else if (name.begins_with("COLOR_0")) {
             PackedColorArray colors;
-            colors.resize(static_cast<int64_t>(vertex_count));
-
-            if (comp_type == 5126 /* float */ && strcmp(acc_type, "VEC4") == 0) {
-                // Directly decode into Color array
+            if (comp_type == 5126) { // float
+                colors.resize(vertex_count);
                 decoderCopyAttribute(decoder, id, colors.ptrw());
-            } else if ((comp_type == 5121 || comp_type == 5123) && normalized) {
-                // Normalize raw data depending on byte size and components
+            } else if (normalized && (comp_type == 5121 || comp_type == 5123)) {
                 int bytes_per_component = (comp_type == 5121) ? 1 : 2;
                 PackedByteArray raw;
-                raw.resize(static_cast<int64_t>(vertex_count) * components_per_vertex * bytes_per_component);
+                raw.resize(vertex_count * components_per_vertex * bytes_per_component);
                 decoderCopyAttribute(decoder, id, raw.ptrw());
 
-                Color *dst = colors.ptrw();
-
-                if (comp_type == 5121) {
-                    const uint8_t *src = reinterpret_cast<const uint8_t *>(raw.ptr());
-                    for (int64_t i = 0; i < static_cast<int64_t>(vertex_count); ++i) {
-                        float r = components_per_vertex > 0 ? src[i * components_per_vertex + 0] / 255.0f : 0.0f;
-                        float g = components_per_vertex > 1 ? src[i * components_per_vertex + 1] / 255.0f : 0.0f;
-                        float b = components_per_vertex > 2 ? src[i * components_per_vertex + 2] / 255.0f : 0.0f;
-                        float a = components_per_vertex > 3 ? src[i * components_per_vertex + 3] / 255.0f : 1.0f;
-                        dst[i] = Color(r, g, b, a);
-                    }
-                } else if (comp_type == 5123) {
-                    const uint16_t *src = reinterpret_cast<const uint16_t *>(raw.ptr());
-                    for (int64_t i = 0; i < static_cast<int64_t>(vertex_count); ++i) {
-                        float r = components_per_vertex > 0 ? src[i * components_per_vertex + 0] / 65535.0f : 0.0f;
-                        float g = components_per_vertex > 1 ? src[i * components_per_vertex + 1] / 65535.0f : 0.0f;
-                        float b = components_per_vertex > 2 ? src[i * components_per_vertex + 2] / 65535.0f : 0.0f;
-                        float a = components_per_vertex > 3 ? src[i * components_per_vertex + 3] / 65535.0f : 1.0f;
-                        dst[i] = Color(r, g, b, a);
-                    }
-                }
+                decode_normalized_color(raw, vertex_count, components_per_vertex, comp_type, colors);
             } else {
                 gddraco::log_warn("Unsupported COLOR_0 format: comp_type = " + godot::String::num_int64(comp_type));
                 continue;

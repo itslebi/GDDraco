@@ -51,7 +51,10 @@ namespace godot {
 
         private:
             //Helper Method to handle weights
-            PackedFloat32Array decode_and_normalize_weights(const PackedByteArray &raw_data, int vertex_count, int components_per_vertex, int comp_type);
+            void decode_and_normalize_weights(const PackedByteArray &raw_data, int vertex_count, int components_per_vertex, int comp_type, PackedFloat32Array &out_result);
+
+            //Helper Method to handle color
+            void decode_normalized_color(const PackedByteArray &raw_data, int vertex_count, int components_per_vertex, int comp_type, PackedColorArray &out_colors);
 
         protected:
             static void _bind_methods();
