@@ -16,7 +16,7 @@ try:
         if env.get("platform") == "windows":
             env.Append(CCFLAGS=["/O2"])
         else: #Remove -flto if on WSL you get Permission denied error
-            env.Append(CCFLAGS=["-O3", "-fno-exceptions", "-fno-rtti", "-flto"])
+            env.Append(CCFLAGS=["-O3", "-fno-exceptions", "-flto"])
             env.Append(LINKFLAGS=["-s", "-flto"])
     env.Append(CCFLAGS=[
         "-DDRACO_POINT_CLOUD_COMPRESSION",
