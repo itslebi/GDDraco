@@ -159,7 +159,6 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
 
 
             //____________________________________________
-
             //GET KHR ATTRIBUTES DATA
             if (!dic_KHR_attributes.has("POSITION")) {
                 gddraco::log_warn("Skipping primitive " + String::num_int64(r) + " due to missing 'POSITION' attribute");
@@ -192,6 +191,15 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
             vec_primitives.push_back(primitive_data);
         }
 
+        //Get materials Array from JSON
+        Array materials;
+        if (json.has("materials")) {
+            materials = json["materials"];
+        } else {
+            gddraco::log_error("No materials in JSON!");
+            return ERR_INVALID_DATA;
+        }
+
         //Assign the mesh data so that it appears in godot
         TypedArray<Ref<GLTFMesh>> meshes_mesh = p_state->get_meshes();
         TypedArray<Ref<Material>> meshes_materials = p_state->get_materials();
@@ -207,6 +215,24 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
 
                 if (prim.material_Idx >= 0) {
                     Ref<Material> mat = meshes_materials[prim.material_Idx];
+                    Dictionary material_dict = materials[prim.material_Idx];
+
+                    bool is_double_sided = true;
+                    if (material_dict.has("doubleSided")) {
+                        is_double_sided = material_dict["doubleSided"];
+                    }
+
+                    //Material Culling Handling
+                    Ref<StandardMaterial3D> std_mat = mat;
+                        if (std_mat.is_valid()) {
+                            Ref<StandardMaterial3D> new_mat = std_mat->duplicate();
+                            if (!is_double_sided) {
+                                new_mat->set_cull_mode(BaseMaterial3D::CULL_DISABLED);
+                            } else {
+                                new_mat->set_cull_mode(BaseMaterial3D::CULL_BACK);
+                            }
+                            mat = new_mat;
+                        }
                     importer_mesh->set_surface_material(t, mat);
                 }
 
@@ -474,6 +500,24 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
                 decoderCopyAttribute(decoder, id, weights.ptrw());
                 arrays[Mesh::ARRAY_WEIGHTS] = weights;
             }
+        } else if (name == "TANGENT") {
+            PackedVector4Array decoded_tangents_4;
+            decoded_tangents_4.resize(vertex_count);
+            decoderCopyAttribute(decoder, id, decoded_tangents_4.ptrw());
+
+            // glTF tangents are vec4: xyz = tangent, w = sign of bitangent
+            PackedFloat32Array tangent_floats;
+            tangent_floats.resize(vertex_count * 4);
+
+            for (int i = 0; i < vertex_count; i++) {
+                Vector4 t = decoded_tangents_4[i];
+                tangent_floats[i * 4 + 0] = t.x;
+                tangent_floats[i * 4 + 1] = t.y;
+                tangent_floats[i * 4 + 2] = t.z;
+                tangent_floats[i * 4 + 3] = -t.w; //Handle hand change
+            }
+
+            arrays[Mesh::ARRAY_TANGENT] = tangent_floats;
         } else if (name.begins_with("COLOR_0")) {
             PackedColorArray colors;
             if (comp_type == 5126) { // float
