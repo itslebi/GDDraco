@@ -33,6 +33,9 @@
 #include <godot_cpp/classes/array_mesh.hpp>
 #include <godot_cpp/classes/gltf_buffer_view.hpp>
 
+#include <godot_cpp/classes/standard_material3d.hpp>
+
+
 #include <src/decoder.h>
 
 #include <cstdint>
