@@ -72,6 +72,9 @@ decoderCopyIndices(Decoder *decoder, void *output);
 
 namespace gddraco {
     //Normals Fix
-    void decoderCopyAttributeVec3f(Decoder *decoder, size_t id, godot::Vector3 *output);
+    void decoderCopyAttributeNormal(Decoder *decoder, size_t id, godot::Vector3 *output);
+
+    //Position Fix
+    void decoderCopyAttributePosition(Decoder *decoder, size_t id, godot::Vector3 *output);
 }
 //End Patch

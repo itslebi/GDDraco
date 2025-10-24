@@ -32,9 +32,7 @@
 #include <godot_cpp/classes/importer_mesh.hpp>
 #include <godot_cpp/classes/array_mesh.hpp>
 #include <godot_cpp/classes/gltf_buffer_view.hpp>
-
 #include <godot_cpp/classes/standard_material3d.hpp>
-
 
 #include <src/decoder.h>
 
@@ -79,7 +77,7 @@ namespace godot {
             Error _import_preflight(const Ref<GLTFState> &p_state, const PackedStringArray &p_extensions) override;
 
             //Tell Godot that KHR_draco_mesh_compression is supported
-            PackedStringArray _get_supported_extensions();
+            PackedStringArray _get_supported_extensions() override;
     };
 }
 

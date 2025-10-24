@@ -157,7 +157,6 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
                 vec_attr.push_back(a);
             }
 
-
             //____________________________________________
             //GET KHR ATTRIBUTES DATA
             if (!dic_KHR_attributes.has("POSITION")) {
@@ -217,7 +216,7 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
                     Ref<Material> mat = meshes_materials[prim.material_Idx];
                     Dictionary material_dict = materials[prim.material_Idx];
 
-                    bool is_double_sided = true;
+                    bool is_double_sided = false;
                     if (material_dict.has("doubleSided")) {
                         is_double_sided = material_dict["doubleSided"];
                     }
@@ -226,10 +225,12 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
                     Ref<StandardMaterial3D> std_mat = mat;
                         if (std_mat.is_valid()) {
                             Ref<StandardMaterial3D> new_mat = std_mat->duplicate();
-                            if (!is_double_sided) {
+                            if (is_double_sided) {
                                 new_mat->set_cull_mode(BaseMaterial3D::CULL_DISABLED);
+                                gddraco::log_info("Setting cull_disabled");
                             } else {
                                 new_mat->set_cull_mode(BaseMaterial3D::CULL_BACK);
+                                gddraco::log_info("Setting cull_back");
                             }
                             mat = new_mat;
                         }
@@ -421,12 +422,12 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
         if (name == "POSITION") {
             PackedVector3Array positions;
             positions.resize(static_cast<int64_t>(vertex_count));
-            decoderCopyAttribute(decoder, id, positions.ptrw());
+            gddraco::decoderCopyAttributePosition(decoder, id, positions.ptrw());
             arrays[Mesh::ARRAY_VERTEX] = positions;
         } else if (name == "NORMAL") {
             PackedVector3Array normals;
             normals.resize(static_cast<int64_t>(vertex_count));
-            gddraco::decoderCopyAttributeVec3f(decoder, id, normals.ptrw());
+            gddraco::decoderCopyAttributeNormal(decoder, id, normals.ptrw());
             arrays[Mesh::ARRAY_NORMAL] = normals;
         } else if (name.begins_with("TEXCOORD_")) {
             int index = name.get_slicec('_', 1).to_int();
@@ -514,7 +515,7 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
                 tangent_floats[i * 4 + 0] = t.x;
                 tangent_floats[i * 4 + 1] = t.y;
                 tangent_floats[i * 4 + 2] = t.z;
-                tangent_floats[i * 4 + 3] = -t.w; //Handle hand change
+                tangent_floats[i * 4 + 3] = t.w;
             }
 
             arrays[Mesh::ARRAY_TANGENT] = tangent_floats;
