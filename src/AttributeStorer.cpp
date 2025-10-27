@@ -25,8 +25,9 @@
 #include "AttributeStorer.hpp"
 
 AttributeStorer::AttributeStorer(godot::String name, godot::GLTFAccessor::GLTFComponentType comp_type, 
-        godot::GLTFAccessor::GLTFAccessorType acc_type, int draco_ID, int count, bool normalized)
-    : name(name), comp_type(comp_type), acc_type(acc_type), draco_ID(draco_ID), count(count), normalized(normalized) {}
+        godot::GLTFAccessor::GLTFAccessorType acc_type, int draco_ID, int count, bool normalized, int64_t byte_offset)
+    : name(name), comp_type(comp_type), acc_type(acc_type), draco_ID(draco_ID), count(count), normalized(normalized),
+    byte_offset(byte_offset) {}
 
 AttributeStorer::AttributeStorer() {}
 

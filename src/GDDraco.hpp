@@ -61,7 +61,7 @@ namespace godot {
             static void _bind_methods();
 
             //Custom method to connect with Draco Decoder from the Draco Wrapper
-            Ref<ArrayMesh> decode_draco_mesh(const PackedByteArray &compressed_buffer, int indices_id, std::vector<AttributeStorer> &vec_attr);
+            Ref<ArrayMesh> decode_draco_mesh(const PackedByteArray &compressed_buffer, int indices_id, Ref<GLTFAccessor> indices_acc, std::vector<AttributeStorer> &vec_attr);
 
             //Method that grabs the decoded mesh and adds it to an ImporterMesh
             Ref<ImporterMesh> add_primitive_to_importer_mesh(const Ref<ArrayMesh> &source_mesh, Ref<ImporterMesh> importer_mesh);

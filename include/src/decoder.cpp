@@ -263,9 +263,9 @@ namespace gddraco {
 
         for (size_t i = 0; i < count; ++i) {
             const float *src = reinterpret_cast<const float *>(data + i * sizeof(float) * 3);
-            godot::Vector3 n = godot::Vector3(-src[0], src[1], src[2]).normalized(); 
-            //No need to call .normalize() on the vector as GLTF 2.0 specifies they come normalized
-            //Flipping normals fixes them?
+            godot::Vector3 n = godot::Vector3(src[0], src[1], -src[2]); 
+            //No need to call .normalized() on the vector as GLTF 2.0 specifies they come normalized
+            //Maybe flip z
             output[i] = n;
         }
     }
@@ -281,8 +281,8 @@ namespace gddraco {
         for (size_t i = 0; i < count; ++i) {
             const float *src = reinterpret_cast<const float *>(data + i * sizeof(float) * 3);
 
-            // Flip X axis to switch from right-handed (glTF) to left-handed (Godot 3.x, etc.)
-            godot::Vector3 pos = godot::Vector3(-src[0], src[1], src[2]);
+            //Maybe flip z
+            godot::Vector3 pos = godot::Vector3(src[0], src[1], src[2]);
             output[i] = pos;
         }
     }

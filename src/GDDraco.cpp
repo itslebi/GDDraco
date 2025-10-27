@@ -152,7 +152,7 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
                 int acessor_IDX = dic_attributes[semantic];
                 Ref<GLTFAccessor> acc = acessors[acessor_IDX];
                 AttributeStorer a = AttributeStorer(semantic, acc->get_component_type(), acc->get_accessor_type(), draco_attribute_id,
-                                                    acc->get_count(), acc->get_normalized());
+                                                    acc->get_count(), acc->get_normalized(), acc->get_byte_offset());
 
                 vec_attr.push_back(a);
             }
@@ -169,6 +169,7 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
                 continue;
             }
             int indices_id = dic_primitive["indices"];
+            Ref<GLTFAccessor> indices_acc = acessors[indices_id];
 
             int material_Idx = -2;
             if (dic_primitive.has("material")) {
@@ -178,12 +179,11 @@ Error GDDraco::_import_post_parse(const Ref<GLTFState> &p_state) {
             }
 
             //Decode Mesh
-            Ref<ArrayMesh> primitive = decode_draco_mesh(buffer, indices_id, vec_attr);
+            Ref<ArrayMesh> primitive = decode_draco_mesh(buffer, indices_id, indices_acc, vec_attr);
             if (primitive == nullptr) {
                 gddraco::log_error("Failed to decode Draco primitive at index " + String::num_int64(r));
                 return ERR_INVALID_DATA; 
             }
-            //UtilityFunctions::print("Primitive Decoded!");
 
             PrimitiveData primitive_data = PrimitiveData(material_Idx, primitive);
 
@@ -362,9 +362,7 @@ void GDDraco::decode_normalized_color(const PackedByteArray &raw_data, int verte
 }
 
 
-Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buffer, int indices_id, std::vector<AttributeStorer> &vec_attr) {
-    //UtilityFunctions::print("GDDraco::decode_draco_mesh");
-
+Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buffer, int indices_id, Ref<GLTFAccessor> indices_acc, std::vector<AttributeStorer> &vec_attr) {
     //Set Up decoder
     Decoder *decoder = decoderCreate();
     if (!decoder) {
@@ -406,6 +404,7 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
         int comp_type = attr.get_comp_type();
         char *acc_type = attr.get_acc_type();
         int components_per_vertex = gddraco::get_component_count(acc_type);
+        int byte_offset = attr.byte_offset;
 
         if (id < 0) {
             gddraco::log_warn("Attribute ID is invalid for: " + name);
@@ -422,7 +421,7 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
         if (name == "POSITION") {
             PackedVector3Array positions;
             positions.resize(static_cast<int64_t>(vertex_count));
-            gddraco::decoderCopyAttributePosition(decoder, id, positions.ptrw());
+            decoderCopyAttribute(decoder, id, positions.ptrw());
             arrays[Mesh::ARRAY_VERTEX] = positions;
         } else if (name == "NORMAL") {
             PackedVector3Array normals;
@@ -454,29 +453,26 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
 
             PackedByteArray raw_joint_data;
             raw_joint_data.resize(element_count * comp_size_bytes);
+            decoderCopyAttribute(decoder, id, raw_joint_data.ptrw());
+            int32_t *dst = joints.ptrw();
 
-        decoderCopyAttribute(decoder, id, raw_joint_data.ptrw());
-
-        int32_t *dst = joints.ptrw();
-
-        if (comp_type == 5121) {
-            const uint8_t* src = reinterpret_cast<const uint8_t*>(raw_joint_data.ptr());
-            for (int64_t i = 0; i < element_count; i++) {
-                dst[i] = static_cast<int32_t>(src[i]);
+            if (comp_type == 5121) {
+                const uint8_t* src = reinterpret_cast<const uint8_t*>(raw_joint_data.ptr());
+                for (int64_t i = 0; i < element_count; i++) {
+                    dst[i] = static_cast<int32_t>(src[i]);
+                }
+            } else if (comp_type == 5123) {
+                const uint16_t* src = reinterpret_cast<const uint16_t*>(raw_joint_data.ptr());
+                for (int64_t i = 0; i < element_count; i++) {
+                    dst[i] = static_cast<int32_t>(src[i]);
+                }
+            } else if (comp_type == 5125) {
+                const uint32_t* src = reinterpret_cast<const uint32_t*>(raw_joint_data.ptr());
+                for (int64_t i = 0; i < element_count; i++) {
+                    dst[i] = static_cast<int32_t>(src[i]);
+                }
             }
-        } else if (comp_type == 5123) {
-            const uint16_t* src = reinterpret_cast<const uint16_t*>(raw_joint_data.ptr());
-            for (int64_t i = 0; i < element_count; i++) {
-                dst[i] = static_cast<int32_t>(src[i]);
-            }
-        } else if (comp_type == 5125) {
-            const uint32_t* src = reinterpret_cast<const uint32_t*>(raw_joint_data.ptr());
-            for (int64_t i = 0; i < element_count; i++) {
-                dst[i] = static_cast<int32_t>(src[i]);
-            }
-        }
-
-        arrays[Mesh::ARRAY_BONES] = joints;
+            arrays[Mesh::ARRAY_BONES] = joints;
         } else if (name == "WEIGHTS_0") {
             int comp_size_bytes = 0;
             switch (comp_type) {
@@ -502,16 +498,20 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
                 arrays[Mesh::ARRAY_WEIGHTS] = weights;
             }
         } else if (name == "TANGENT") {
+            if (components_per_vertex != 4) {
+                gddraco::log_error("Unexpected tangent attribute size");
+                return nullptr;
+            }
+
             PackedVector4Array decoded_tangents_4;
             decoded_tangents_4.resize(vertex_count);
             decoderCopyAttribute(decoder, id, decoded_tangents_4.ptrw());
 
-            // glTF tangents are vec4: xyz = tangent, w = sign of bitangent
             PackedFloat32Array tangent_floats;
             tangent_floats.resize(vertex_count * 4);
 
             for (int i = 0; i < vertex_count; i++) {
-                Vector4 t = decoded_tangents_4[i];
+                const Vector4 &t = decoded_tangents_4[i];
                 tangent_floats[i * 4 + 0] = t.x;
                 tangent_floats[i * 4 + 1] = t.y;
                 tangent_floats[i * 4 + 2] = t.z;
@@ -542,22 +542,38 @@ Ref<ArrayMesh> GDDraco::decode_draco_mesh(const PackedByteArray &compressed_buff
     }
 
     // Decode INDICES (required)
-    if (!decoderReadIndices(decoder, 5123)) { // 5123 = unsigned short indices
+    int comp_type = static_cast<int>(indices_acc->get_component_type());
+    if (!decoderReadIndices(decoder, comp_type)) {
         decoderRelease(decoder);
         gddraco::log_error("Failed to decode indices");
         return nullptr;
     }
 
-    PackedByteArray raw_indices_16;
-    raw_indices_16.resize(index_count * 2);
-    decoderCopyIndices(decoder, raw_indices_16.ptrw());
-
     PackedInt32Array indices;
     indices.resize(index_count);
 
-    const uint16_t *src_idx = reinterpret_cast<const uint16_t *>(raw_indices_16.ptr());
-    for (uint32_t i = 0; i < index_count; ++i) {
-        indices[i] = static_cast<int32_t>(src_idx[i]);
+    if (comp_type == 5123) { // unsigned short
+        PackedByteArray raw_indices_16;
+        raw_indices_16.resize(index_count * 2); // 2 bytes per index
+        decoderCopyIndices(decoder, raw_indices_16.ptrw());
+
+        const uint16_t *src_idx = reinterpret_cast<const uint16_t *>(raw_indices_16.ptr());
+        for (uint32_t i = 0; i < index_count; ++i) {
+            indices[i] = static_cast<int32_t>(src_idx[i]);
+        }
+    } else if (comp_type == 5125) { // unsigned int
+        PackedByteArray raw_indices_32;
+        raw_indices_32.resize(index_count * 4); // 4 bytes per index
+        decoderCopyIndices(decoder, raw_indices_32.ptrw());
+
+        const uint32_t *src_idx = reinterpret_cast<const uint32_t *>(raw_indices_32.ptr());
+        for (uint32_t i = 0; i < index_count; ++i) {
+            indices[i] = static_cast<int32_t>(src_idx[i]);
+        }
+    } else {
+        decoderRelease(decoder);
+        gddraco::log_error("Unsupported index component type");
+        return nullptr;
     }
     arrays[Mesh::ARRAY_INDEX] = indices;
 

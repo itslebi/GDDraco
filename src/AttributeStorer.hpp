@@ -39,9 +39,11 @@ class AttributeStorer {
         int draco_ID;
         int count;
         bool normalized;
+        int64_t byte_offset;
 
         AttributeStorer(godot::String name, godot::GLTFAccessor::GLTFComponentType comp_type, 
-                godot::GLTFAccessor::GLTFAccessorType acc_type, int draco_ID, int count, bool normalized);
+                godot::GLTFAccessor::GLTFAccessorType acc_type, int draco_ID, int count, bool normalized,
+                int64_t byte_offset);
         
         AttributeStorer();
 
